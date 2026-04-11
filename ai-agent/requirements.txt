@@ -1,7 +1,13 @@
-fastapi 
-uvicorn 
-langgraph 
+fastapi
+uvicorn[standard]
+langgraph
 langchain
 langchain-openai
 tavily-python
 python-multipart
+pydantic-settings
+python-dotenv
+httpx
+pymupdf4llm
+langsmith
+langchain-groq
