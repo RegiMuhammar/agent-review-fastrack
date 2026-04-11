@@ -569,10 +569,10 @@ python main.py
 curl http://localhost:8001/health
 
 # Test evaluate endpoint (harus return 403 tanpa key)
-curl -X POST http://localhost:8001/api/evaluate
+curl -X POST http://localhost:8001/api-agent/evaluate
 
 # Test evaluate endpoint (dengan key, harus return 200)
-curl -X POST http://localhost:8001/api/evaluate \
+curl -X POST http://localhost:8001/api-agent/evaluate \
   -H "X-Internal-Key: super-secret-internal-key-ganti-ini" \
   -H "Content-Type: application/json" \
   -d '{"analysis_id": "1", "file_path": "test.pdf"}'
