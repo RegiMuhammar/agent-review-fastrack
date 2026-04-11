@@ -1,0 +1,10 @@
+# ai agent
+terminal list:
+
+uv (cek version)
+uv init
+buat virtual env: uv venv
+activate virtual env: .\.venv\Scripts\activate
+
+short path dir:
+function prompt { $p = (Get-Location).Path -split '\\'; "$($p[-2])\$($p[-1])> " }
