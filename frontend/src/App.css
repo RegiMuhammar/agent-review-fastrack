@@ -1,4 +1,4 @@
-.login-shell {
+.auth-shell {
   min-height: 100svh;
   display: grid;
   place-items: center;
@@ -9,7 +9,7 @@
     var(--background);
 }
 
-.login-card {
+.auth-card {
   width: min(100%, 420px);
   border: 1px solid var(--border);
   background: var(--card);
@@ -18,35 +18,35 @@
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.1);
 }
 
-.login-head {
+.auth-head {
   margin-bottom: 20px;
 }
 
-.login-head h1 {
+.auth-head h1 {
   margin: 0 0 8px;
   font-size: 2rem;
   letter-spacing: -0.04em;
   color: var(--foreground);
 }
 
-.login-head p {
+.auth-head p {
   color: var(--muted-foreground);
   font-size: 0.95rem;
 }
 
-.login-form {
+.auth-form {
   display: grid;
   gap: 12px;
 }
 
-.login-form label {
+.auth-form label {
   text-align: left;
   font-size: 0.86rem;
   font-weight: 600;
   color: var(--foreground);
 }
 
-.login-form input {
+.auth-form input {
   height: 42px;
   border: 1px solid var(--input);
   border-radius: 12px;
@@ -56,19 +56,39 @@
   color: var(--foreground);
 }
 
-.login-form input:focus {
+.auth-form input:focus {
   outline: 2px solid color-mix(in oklch, var(--ring), transparent 40%);
   outline-offset: 1px;
 }
 
-.login-submit {
+.auth-submit {
   margin-top: 6px;
   height: 42px;
 }
 
-.login-status {
+.auth-status {
   margin: 4px 0 0;
   color: oklch(0.48 0.14 146.54);
   font-size: 0.9rem;
   text-align: left;
+}
+
+.form-error {
+  margin: 4px 0 0;
+  color: var(--destructive);
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.form-note {
+  margin: 4px 0 0;
+  color: var(--muted-foreground);
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.form-note a {
+  color: var(--foreground);
+  font-weight: 600;
+  text-underline-offset: 3px;
 }
