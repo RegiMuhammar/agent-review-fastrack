@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AnalysisController extends Controller
 {
@@ -96,6 +97,28 @@ class AnalysisController extends Controller
                 'analysis' => $analysisData,
             ],
         ]);
+    }
+
+    public function file(Request $request, int $analysis): BinaryFileResponse
+    {
+        $analysisData = Analysis::query()
+            ->where('user_id', $request->user()->id)
+            ->whereKey($analysis)
+            ->firstOrFail();
+
+        abort_unless(
+            Storage::disk('local')->exists($analysisData->file_path),
+            404,
+            'File dokumen tidak ditemukan.'
+        );
+
+        return response()->file(
+            Storage::disk('local')->path($analysisData->file_path),
+            [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="'.basename($analysisData->file_path).'"',
+            ]
+        );
     }
 
     public function destroy(Request $request, int $analysis): JsonResponse

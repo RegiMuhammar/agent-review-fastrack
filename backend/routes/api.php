@@ -16,6 +16,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/analyses', [AnalysisController::class, 'index']);
             Route::post('/analyses', [AnalysisController::class, 'store']);
             Route::get('/analyses/{analysis}', [AnalysisController::class, 'show']);
+            Route::get('/analyses/{analysis}/file', [AnalysisController::class, 'file']);
             Route::delete('/analyses/{analysis}', [AnalysisController::class, 'destroy']);
         });
     });
