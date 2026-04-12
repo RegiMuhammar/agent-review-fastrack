@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -10,16 +11,54 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { createAnalysis } from '@/lib/api'
+import { getAuthToken } from '@/lib/auth'
 
 function ReviewJurnalPage() {
+  const navigate = useNavigate()
   const [namaJurnal, setNamaJurnal] = useState('')
   const [tipeJurnal, setTipeJurnal] = useState('essay')
   const [uploadFile, setUploadFile] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
-    // Placeholder submit flow before backend integration for review jurnal.
-    console.log({ namaJurnal, tipeJurnal, uploadFile })
+
+    const token = getAuthToken()
+
+    if (!token) {
+      setErrorMessage('Sesi login tidak ditemukan. Silakan login ulang.')
+      return
+    }
+
+    if (!uploadFile) {
+      setErrorMessage('File jurnal wajib diupload.')
+      return
+    }
+
+    setIsSubmitting(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+
+    try {
+      await createAnalysis(token, {
+        docName: namaJurnal,
+        docType: tipeJurnal,
+        file: uploadFile,
+      })
+
+      setNamaJurnal('')
+      setTipeJurnal('essay')
+      setUploadFile(null)
+      event.target.reset()
+      setSuccessMessage('Dokumen berhasil diupload.')
+    } catch (error) {
+      setErrorMessage(error.message || 'Gagal mengirim data jurnal.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -66,14 +105,40 @@ function ReviewJurnalPage() {
               <Input
                 id="upload-file"
                 type="file"
+                accept="application/pdf,.pdf"
                 onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
                 required
               />
             </div>
 
-            <Button type="submit" className="h-10 w-full bg-amber-700 text-white hover:bg-amber-800 sm:w-auto">
-              Simpan Data Jurnal
-            </Button>
+            {successMessage ? (
+              <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                {successMessage}
+              </p>
+            ) : null}
+
+            {errorMessage ? (
+              <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {errorMessage}
+              </p>
+            ) : null}
+
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="h-10 w-full bg-amber-700 text-white hover:bg-amber-800 sm:w-auto"
+              >
+                {isSubmitting ? 'Menyimpan...' : 'Simpan Data Jurnal'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate('/history-jurnal')}
+              >
+                Lihat History Jurnal
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>

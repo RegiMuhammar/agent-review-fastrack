@@ -21,13 +21,15 @@ function getErrorMessage(payload, fallbackMessage) {
 }
 
 async function request(path, options = {}) {
-  const { method = 'GET', body, token } = options
+  const { method = 'GET', body, token, responseType = 'json' } = options
 
   const headers = {
     Accept: 'application/json',
   }
 
-  if (body) {
+  const isFormData = body instanceof FormData
+
+  if (body && !isFormData) {
     headers['Content-Type'] = 'application/json'
   }
 
@@ -38,8 +40,16 @@ async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method,
     headers,
-    body: body ? JSON.stringify(body) : undefined,
+    body: body ? (isFormData ? body : JSON.stringify(body)) : undefined,
   })
+
+  if (responseType === 'blob') {
+    if (!response.ok) {
+      throw new Error('Gagal mengambil file PDF.')
+    }
+
+    return response.blob()
+  }
 
   const payload = await response.json().catch(() => null)
 
@@ -75,5 +85,47 @@ export function logout(token) {
   return request('/auth/logout', {
     method: 'POST',
     token,
+  })
+}
+
+export function createAnalysis(token, payload) {
+  const formData = new FormData()
+  formData.append('doc_name', payload.docName)
+  formData.append('doc_type', payload.docType)
+  formData.append('file', payload.file)
+
+  return request('/auth/analyses', {
+    method: 'POST',
+    token,
+    body: formData,
+  })
+}
+
+export function listAnalyses(token) {
+  return request('/auth/analyses', {
+    method: 'GET',
+    token,
+  })
+}
+
+export function getAnalysis(token, analysisId) {
+  return request(`/auth/analyses/${analysisId}`, {
+    method: 'GET',
+    token,
+  })
+}
+
+export function deleteAnalysis(token, analysisId) {
+  return request(`/auth/analyses/${analysisId}`, {
+    method: 'DELETE',
+    token,
+  })
+}
+
+export function getAnalysisFileBlob(token, analysisId) {
+  return request(`/auth/analyses/${analysisId}/file`, {
+    method: 'GET',
+    token,
+    responseType: 'blob',
   })
 }

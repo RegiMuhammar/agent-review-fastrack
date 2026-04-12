@@ -1,4 +1,4 @@
-import { LayoutDashboard, NotebookPen } from 'lucide-react'
+import { History, LayoutDashboard, NotebookPen } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 
 function sidebarLinkClassName({ isActive }) {
@@ -28,6 +28,10 @@ function ProtectedLayout() {
             <NavLink to="/review-jurnal" className={sidebarLinkClassName}>
               <NotebookPen className="size-4" />
               Review Jurnal
+            </NavLink>
+            <NavLink to="/history-jurnal" className={sidebarLinkClassName}>
+              <History className="size-4" />
+              History Jurnal
             </NavLink>
           </nav>
         </aside>

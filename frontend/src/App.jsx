@@ -5,6 +5,7 @@ import { getAuthToken } from '@/lib/auth'
 import LoginPage from '@/pages/auth/LoginPage'
 import RegisterPage from '@/pages/auth/RegisterPage'
 import DashboardPage from '@/pages/dashboard/DashboardPage'
+import HistoryJurnalPage from '@/pages/dashboard/HistoryJurnalPage'
 import ReviewJurnalPage from '@/pages/dashboard/ReviewJurnalPage'
 
 function RootRedirect() {
@@ -52,6 +53,7 @@ function App() {
           <Route element={<ProtectedLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/review-jurnal" element={<ReviewJurnalPage />} />
+            <Route path="/history-jurnal" element={<HistoryJurnalPage />} />
           </Route>
         </Route>
 
