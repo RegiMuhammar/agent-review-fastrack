@@ -15,7 +15,7 @@ class ReviewEngineState(TypedDict):
     is_valid:       bool
     error:          str | None
 
-    # Classification
+    # Classification [ini bisa dicut jadi tidak perlu klasifikasi layer karna udah ada input dari user saat submit dokumne]
     doc_type: Literal["essay", "research", "bizplan"] | None
     classify_confidence: float
 
