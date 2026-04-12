@@ -63,8 +63,8 @@ function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(120deg,#f8f2e8_0%,#f3eadf_45%,#fefcf9_100%)] px-4 py-8 sm:px-8">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+    <main className="w-full">
+      <div className="flex w-full flex-col gap-6">
         <header className="flex flex-col items-start justify-between gap-4 rounded-3xl border border-amber-200/70 bg-white/80 p-6 shadow-[0_20px_60px_rgba(120,75,20,0.12)] backdrop-blur sm:flex-row sm:items-center">
           <div>
             <p className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">

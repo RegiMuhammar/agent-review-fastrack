@@ -1,9 +1,11 @@
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom'
 
+import ProtectedLayout from '@/components/layout/ProtectedLayout'
 import { getAuthToken } from '@/lib/auth'
 import LoginPage from '@/pages/auth/LoginPage'
 import RegisterPage from '@/pages/auth/RegisterPage'
 import DashboardPage from '@/pages/dashboard/DashboardPage'
+import ReviewJurnalPage from '@/pages/dashboard/ReviewJurnalPage'
 
 function RootRedirect() {
   const token = getAuthToken()
@@ -47,7 +49,10 @@ function App() {
         </Route>
 
         <Route element={<ProtectedRoute />}>
-          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route element={<ProtectedLayout />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/review-jurnal" element={<ReviewJurnalPage />} />
+          </Route>
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
