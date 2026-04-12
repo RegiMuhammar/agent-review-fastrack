@@ -1,16 +1,22 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import AuthLayout from '@/layouts/AuthLayout'
+import { register } from '@/lib/api'
+import { setAuthToken, setAuthUser } from '@/lib/auth'
 
 function RegisterPage() {
+  const navigate = useNavigate()
   const [form, setForm] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: '',
   })
-  const [submitted, setSubmitted] = useState(false)
+  const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -18,32 +24,51 @@ function RegisterPage() {
       ...current,
       [name]: value,
     }))
-    setSubmitted(false)
+    setSuccess('')
     setError('')
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
 
     if (form.password !== form.confirmPassword) {
       setError('Password dan konfirmasi password harus sama.')
-      setSubmitted(false)
       return
     }
 
+    setLoading(true)
     setError('')
-    setSubmitted(true)
+
+    try {
+      const response = await register({
+        name: form.name,
+        email: form.email,
+        password: form.password,
+      })
+      const token = response?.data?.token
+      const user = response?.data?.user
+
+      if (!token || !user) {
+        throw new Error('Response register tidak valid.')
+      }
+
+      setAuthToken(token)
+      setAuthUser(user)
+      setSuccess('Registrasi berhasil. Mengalihkan ke dashboard...')
+      navigate('/dashboard', { replace: true })
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
-    <main className="auth-shell">
-      <section className="auth-card" aria-labelledby="register-title">
-        <div className="auth-head">
-          <h1 id="register-title">Daftar Akun</h1>
-          <p>Buat akun baru untuk mulai menggunakan aplikasi.</p>
-        </div>
-
-        <form className="auth-form" onSubmit={handleSubmit}>
+    <AuthLayout
+      title="Daftar Akun"
+      subtitle="Buat akun baru untuk mulai menggunakan aplikasi."
+    >
+      <form className="auth-form" onSubmit={handleSubmit}>
           <label htmlFor="name">Nama Lengkap</label>
           <input
             id="name"
@@ -94,8 +119,8 @@ function RegisterPage() {
             required
           />
 
-          <Button type="submit" className="auth-submit">
-            Daftar
+          <Button type="submit" className="auth-submit" disabled={loading}>
+            {loading ? 'Memproses...' : 'Daftar'}
           </Button>
 
           {error && (
@@ -104,18 +129,17 @@ function RegisterPage() {
             </p>
           )}
 
-          {submitted && (
+          {success && (
             <p className="auth-status" role="status">
-              Registrasi dikirim untuk {form.name} ({form.email})
+              {success}
             </p>
           )}
 
           <p className="form-note">
             Sudah punya akun? <Link to="/login">Masuk di sini</Link>
           </p>
-        </form>
-      </section>
-    </main>
+      </form>
+    </AuthLayout>
   )
 }
 

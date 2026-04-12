@@ -92,3 +92,55 @@
   font-weight: 600;
   text-underline-offset: 3px;
 }
+
+.dashboard-shell {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(16, 185, 129, 0.11), transparent 40%),
+    radial-gradient(circle at 100% 100%, rgba(14, 165, 233, 0.12), transparent 42%),
+    var(--background);
+}
+
+.dashboard-card {
+  width: min(100%, 480px);
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 18px;
+  padding: 28px 24px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.09);
+  display: grid;
+  gap: 14px;
+}
+
+.dashboard-head h1 {
+  margin: 0;
+  font-size: 2rem;
+  letter-spacing: -0.03em;
+  color: var(--foreground);
+}
+
+.dashboard-head p {
+  margin-top: 8px;
+  color: var(--muted-foreground);
+}
+
+.dashboard-user {
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.dashboard-info {
+  text-align: left;
+  color: var(--muted-foreground);
+}
+
+.dashboard-logout {
+  height: 42px;
+}

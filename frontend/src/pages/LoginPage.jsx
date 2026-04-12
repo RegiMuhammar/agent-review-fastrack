@@ -1,13 +1,20 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import AuthLayout from '@/layouts/AuthLayout'
+import { login } from '@/lib/api'
+import { setAuthToken, setAuthUser } from '@/lib/auth'
 
 function LoginPage() {
+  const navigate = useNavigate()
   const [form, setForm] = useState({
     email: '',
     password: '',
   })
-  const [submitted, setSubmitted] = useState(false)
+  const [success, setSuccess] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -15,23 +22,38 @@ function LoginPage() {
       ...current,
       [name]: value,
     }))
-    setSubmitted(false)
+    setSuccess('')
+    setError('')
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
-    setSubmitted(true)
+    setLoading(true)
+    setError('')
+
+    try {
+      const response = await login(form)
+      const token = response?.data?.token
+      const user = response?.data?.user
+
+      if (!token || !user) {
+        throw new Error('Response login tidak valid.')
+      }
+
+      setAuthToken(token)
+      setAuthUser(user)
+      setSuccess('Login berhasil. Mengalihkan ke dashboard...')
+      navigate('/dashboard', { replace: true })
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
-    <main className="auth-shell">
-      <section className="auth-card" aria-labelledby="login-title">
-        <div className="auth-head">
-          <h1 id="login-title">Masuk</h1>
-          <p>Silakan login dengan email dan password kamu.</p>
-        </div>
-
-        <form className="auth-form" onSubmit={handleSubmit}>
+    <AuthLayout title="Masuk" subtitle="Silakan login dengan email dan password kamu.">
+      <form className="auth-form" onSubmit={handleSubmit}>
           <label htmlFor="email">Email</label>
           <input
             id="email"
@@ -57,22 +79,27 @@ function LoginPage() {
             required
           />
 
-          <Button type="submit" className="auth-submit">
-            Login
+          <Button type="submit" className="auth-submit" disabled={loading}>
+            {loading ? 'Memproses...' : 'Login'}
           </Button>
 
-          {submitted && (
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+
+          {success && (
             <p className="auth-status" role="status">
-              Login dikirim untuk {form.email}
+              {success}
             </p>
           )}
 
           <p className="form-note">
             Belum punya akun? <Link to="/register">Daftar sekarang</Link>
           </p>
-        </form>
-      </section>
-    </main>
+      </form>
+    </AuthLayout>
   )
 }
 
