@@ -126,9 +126,9 @@ function HistoryJurnalPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
-      <Card className="border-amber-200/70 bg-white/90">
+      <Card className="border-[#5E74C9]/16 bg-white/90">
         <CardHeader>
-          <CardTitle className="text-xl text-stone-900">History Jurnal</CardTitle>
+          <CardTitle className="text-xl text-[#2E3F86]">History Jurnal</CardTitle>
           <CardDescription>
             Daftar dokumen yang sudah pernah kamu input.
           </CardDescription>
@@ -142,11 +142,11 @@ function HistoryJurnalPage() {
       ) : null}
 
       {selectedDetail ? (
-        <Card className="border-amber-200/70 bg-white/95">
+        <Card className="border-[#5E74C9]/16 bg-white/95">
           <CardHeader>
-            <CardTitle className="text-base text-stone-900">Detail Dokumen</CardTitle>
+            <CardTitle className="text-base text-[#2E3F86]">Detail Dokumen</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-1 text-sm text-stone-700">
+          <CardContent className="grid gap-1 text-sm text-[#6A7DB7]">
             <p>Nama: {selectedDetail.doc_name}</p>
             <p>Tipe: {selectedDetail.doc_type}</p>
             <p>Status: {selectedDetail.status}</p>
@@ -156,11 +156,11 @@ function HistoryJurnalPage() {
         </Card>
       ) : null}
 
-      {isLoading ? <p className="text-sm text-stone-600">Memuat data...</p> : null}
+      {isLoading ? <p className="text-sm text-[#6A7DB7]">Memuat data...</p> : null}
 
       {!isLoading && items.length === 0 ? (
-        <Card className="border-dashed border-amber-200 bg-white/85">
-          <CardContent className="py-8 text-center text-sm text-stone-600">
+        <Card className="border-dashed border-[#5E74C9]/16 bg-white/85">
+          <CardContent className="py-8 text-center text-sm text-[#6A7DB7]">
             Belum ada data jurnal yang tersimpan.
           </CardContent>
         </Card>
@@ -168,9 +168,9 @@ function HistoryJurnalPage() {
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {items.map((item) => (
-          <Card key={item.id} className="border-amber-200/70 bg-white/90">
+          <Card key={item.id} className="border-[#5E74C9]/16 bg-white/90">
             <CardHeader>
-              <CardTitle className="line-clamp-2 text-base text-stone-900">
+              <CardTitle className="line-clamp-2 text-base text-[#2E3F86]">
                 {item.doc_name}
               </CardTitle>
               <CardDescription>

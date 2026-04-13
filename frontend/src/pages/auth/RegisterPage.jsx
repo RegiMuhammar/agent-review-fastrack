@@ -66,11 +66,11 @@ function RegisterPage() {
     <AuthShell
       mode="register"
       title="Buat akun baru"
-      subtitle="Daftar untuk mulai menggunakan Agent Review Fasttrack."
+      subtitle="Daftar untuk mulai menggunakan Jurnal AI Fasttrack."
     >
-      <Card className="border-amber-100 bg-white/85 shadow-none">
+      <Card className="bg-white/85 shadow-none ring-0">
         <CardHeader className="px-0 sm:px-1">
-          <CardTitle className="text-base text-stone-900">Registrasi</CardTitle>
+          <CardTitle className="text-base text-[#2E3F86]">Registrasi</CardTitle>
           <CardDescription>
             Isi data di bawah untuk membuat akun baru.
           </CardDescription>
@@ -143,17 +143,17 @@ function RegisterPage() {
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="h-10 w-full bg-amber-700 text-white hover:bg-amber-800"
+              className="h-10 w-full bg-[#5E74C9] text-white hover:bg-[#5166B8]"
             >
               {isSubmitting ? 'Memproses...' : 'Buat akun'}
             </Button>
           </form>
 
-          <p className="text-center text-sm text-stone-600">
+          <p className="text-center text-sm text-[#6A7DB7]">
             Sudah punya akun?{' '}
             <Link
               to="/login"
-              className="font-semibold text-amber-800 hover:text-amber-900"
+              className="font-semibold text-[#5E74C9] hover:text-[#5166B8]"
             >
               Login di sini
             </Link>

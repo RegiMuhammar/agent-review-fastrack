@@ -1,18 +1,53 @@
-import { useEffect, useState } from 'react'
-import { LogOut, Sparkles } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { FileText, LogOut, Paperclip, Sparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { fetchMe, logout } from '@/lib/api'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { createAnalysis, fetchMe, logout } from '@/lib/api'
 import { clearAuthSession, getAuthToken, getAuthUser, setAuthSession } from '@/lib/auth'
 
 function DashboardPage() {
   const navigate = useNavigate()
+  const fileInputRef = useRef(null)
   const [user, setUser] = useState(getAuthUser())
+  const [namaJurnal, setNamaJurnal] = useState('')
+  const [tipeJurnal, setTipeJurnal] = useState('essay')
+  const [uploadFile, setUploadFile] = useState(null)
+  const [isDraggingFile, setIsDraggingFile] = useState(false)
+  const [isSubmittingJurnal, setIsSubmittingJurnal] = useState(false)
+  const [formErrorMessage, setFormErrorMessage] = useState('')
+  const [formSuccessMessage, setFormSuccessMessage] = useState('')
   const [isFetchingProfile, setIsFetchingProfile] = useState(true)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+
+  function handleSelectFile(file) {
+    if (!file) {
+      return
+    }
+
+    setUploadFile(file)
+    setFormErrorMessage('')
+  }
+
+  function handleInputFileChange(event) {
+    handleSelectFile(event.target.files?.[0] ?? null)
+  }
+
+  function handleDropFile(event) {
+    event.preventDefault()
+    setIsDraggingFile(false)
+    handleSelectFile(event.dataTransfer.files?.[0] ?? null)
+  }
 
   useEffect(() => {
     const token = getAuthToken()
@@ -62,20 +97,61 @@ function DashboardPage() {
     }
   }
 
+  async function handleSubmitJurnal(event) {
+    event.preventDefault()
+
+    const token = getAuthToken()
+
+    if (!token) {
+      setFormErrorMessage('Sesi login tidak ditemukan. Silakan login ulang.')
+      return
+    }
+
+    if (!uploadFile) {
+      setFormErrorMessage('File jurnal wajib diupload.')
+      return
+    }
+
+    setIsSubmittingJurnal(true)
+    setFormErrorMessage('')
+    setFormSuccessMessage('')
+
+    try {
+      await createAnalysis(token, {
+        docName: namaJurnal,
+        docType: tipeJurnal,
+        file: uploadFile,
+      })
+
+      setNamaJurnal('')
+      setTipeJurnal('essay')
+      setUploadFile(null)
+      event.target.reset()
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      setFormSuccessMessage('Dokumen berhasil diupload.')
+    } catch (error) {
+      setFormErrorMessage(error.message || 'Gagal mengirim data jurnal.')
+    } finally {
+      setIsSubmittingJurnal(false)
+    }
+  }
+
   return (
     <main className="w-full">
       <div className="flex w-full flex-col gap-6">
-        <header className="flex flex-col items-start justify-between gap-4 rounded-3xl border border-amber-200/70 bg-white/80 p-6 shadow-[0_20px_60px_rgba(120,75,20,0.12)] backdrop-blur sm:flex-row sm:items-center">
+        <header className="flex flex-col items-start justify-between gap-4 rounded-3xl border border-[#5E74C9]/16 bg-white/85 p-6 shadow-[0_20px_60px_rgba(94,116,201,0.11)] backdrop-blur sm:flex-row sm:items-center">
           <div>
-            <p className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">
+            <p className="inline-flex items-center gap-2 rounded-full bg-[#5E74C9]/10 px-3 py-1 text-xs font-semibold text-[#5E74C9]">
               <Sparkles className="size-3.5" />
               DASHBOARD
             </p>
-            <h1 className="mt-3 text-2xl font-semibold text-stone-900 sm:text-3xl">
+            <h1 className="mt-3 text-2xl font-semibold text-[#2E3F86] sm:text-3xl">
               Halo, {user?.name || 'Developer'}
             </h1>
-            <p className="mt-1 text-sm text-stone-600">
-              Selamat datang kembali di Agent Review Fasttrack.
+            <p className="mt-1 text-sm text-[#6A7DB7]">
+              Selamat datang kembali di Jurnal AI Fasttrack.
             </p>
           </div>
 
@@ -83,44 +159,131 @@ function DashboardPage() {
             type="button"
             onClick={handleLogout}
             disabled={isLoggingOut}
-            className="h-10 bg-stone-900 text-white hover:bg-stone-800"
+            className="h-10 bg-[#5E74C9] text-white hover:bg-[#5166B8]"
           >
             <LogOut className="mr-1 size-4" />
             {isLoggingOut ? 'Keluar...' : 'Logout'}
           </Button>
         </header>
 
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Card className="border-amber-100 bg-white/90">
-            <CardHeader>
-              <CardTitle className="text-sm text-stone-700">Email akun</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-base font-medium text-stone-900">{user?.email || '-'}</p>
-            </CardContent>
-          </Card>
+        <Card className="border-[#5E74C9]/16 bg-white/85 shadow-[0_20px_60px_rgba(94,116,201,0.11)] backdrop-blur">
+          <CardHeader>
+            <CardTitle className="text-xl text-[#2E3F86]">Review Jurnal</CardTitle>
+            <CardDescription>
+              Lengkapi data jurnal untuk proses review.
+            </CardDescription>
+          </CardHeader>
 
-          <Card className="border-amber-100 bg-white/90">
-            <CardHeader>
-              <CardTitle className="text-sm text-stone-700">Status</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-base font-medium text-emerald-700">Aktif</p>
-            </CardContent>
-          </Card>
+          <CardContent>
+            <form className="grid gap-5" onSubmit={handleSubmitJurnal}>
+              <div className="grid gap-2">
+                <Label htmlFor="nama-jurnal-dashboard">Nama Jurnal</Label>
+                <Input
+                  id="nama-jurnal-dashboard"
+                  type="text"
+                  placeholder="Contoh: Analisis Transformasi Digital"
+                  value={namaJurnal}
+                  onChange={(event) => setNamaJurnal(event.target.value)}
+                  required
+                />
+              </div>
 
-          <Card className="border-amber-100 bg-white/90 sm:col-span-2 lg:col-span-1">
-            <CardHeader>
-              <CardTitle className="text-sm text-stone-700">Aksi selanjutnya</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-base text-stone-900">Hubungkan menu ini ke fitur analisis proyek.</p>
-            </CardContent>
-          </Card>
-        </section>
+              <div className="grid gap-2">
+                <Label htmlFor="tipe-jurnal-dashboard">Tipe Jurnal</Label>
+                <select
+                  id="tipe-jurnal-dashboard"
+                  value={tipeJurnal}
+                  onChange={(event) => setTipeJurnal(event.target.value)}
+                  className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-[#2E3F86] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  required
+                >
+                  <option value="essay">Essay</option>
+                  <option value="research">Research</option>
+                  <option value="bizplan">Bizplan</option>
+                </select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="upload-file-dashboard" className="gap-1.5">
+                  <Paperclip className="size-3.5" />
+                  Paper PDF *
+                </Label>
+
+                <input
+                  ref={fileInputRef}
+                  id="upload-file-dashboard"
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  onChange={handleInputFileChange}
+                  className="sr-only"
+                  required
+                />
+
+                <label
+                  htmlFor="upload-file-dashboard"
+                  onDrop={handleDropFile}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDragEnter={() => setIsDraggingFile(true)}
+                  onDragLeave={() => setIsDraggingFile(false)}
+                  className={`cursor-pointer rounded-2xl border border-dashed bg-[#5E74C9]/5 p-8 text-center transition-all ${
+                    isDraggingFile
+                      ? 'border-[#5E74C9] bg-[#5E74C9]/10'
+                      : 'border-[#5E74C9]/20 hover:border-[#5E74C9]/35 hover:bg-[#5E74C9]/8'
+                  }`}
+                >
+                  <span className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-[#5E74C9]/12 text-[#5E74C9]">
+                    <FileText className="size-6" />
+                  </span>
+
+                  <p className="text-lg font-medium text-[#2E3F86]">
+                    Choose PDF file or drag and drop
+                  </p>
+                  <p className="mt-1 text-sm text-[#6A7DB7]">
+                    Max 10MB • First 15 pages analyzed
+                  </p>
+
+                  {uploadFile ? (
+                    <p className="mt-3 text-sm font-medium text-[#5E74C9]">
+                      {uploadFile.name}
+                    </p>
+                  ) : null}
+                </label>
+              </div>
+
+              {formSuccessMessage ? (
+                <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                  {formSuccessMessage}
+                </p>
+              ) : null}
+
+              {formErrorMessage ? (
+                <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {formErrorMessage}
+                </p>
+              ) : null}
+
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  type="submit"
+                  disabled={isSubmittingJurnal}
+                  className="h-10 w-full bg-[#5E74C9] text-white hover:bg-[#5166B8] sm:w-auto"
+                >
+                  {isSubmittingJurnal ? 'Menyimpan...' : 'Simpan Data Jurnal'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate('/history-jurnal')}
+                >
+                  Lihat History Jurnal
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
 
         {isFetchingProfile ? (
-          <p className="text-sm text-stone-600">Mengambil data akun...</p>
+          <p className="text-sm text-[#6A7DB7]">Mengambil data akun...</p>
         ) : null}
 
         {errorMessage ? (

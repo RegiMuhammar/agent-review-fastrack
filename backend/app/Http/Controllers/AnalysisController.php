@@ -33,16 +33,19 @@ class AnalysisController extends Controller
             'doc_name' => ['required', 'string', 'max:255'],
             'doc_type' => ['required', Rule::in(['essay', 'research', 'bizplan'])],
             'file' => [
+                'bail',
                 'required',
                 'file',
                 'mimetypes:application/pdf',
-                'max:10240',
                 function (string $attribute, mixed $value, \Closure $fail): void {
                     if (! $value instanceof \Illuminate\Http\UploadedFile) {
                         $fail('File tidak valid.');
 
                         return;
                     }
+
+                    $maxSizeBytes = 10 * 1024 * 1024;
+                    $isTooLarge = $value->getSize() > $maxSizeBytes;
 
                     $pages = $this->countPdfPages($value->getPathname());
 
@@ -52,14 +55,27 @@ class AnalysisController extends Controller
                         return;
                     }
 
-                    if ($pages > 15) {
+                    $isTooManyPages = $pages > 15;
+
+                    if ($isTooLarge && $isTooManyPages) {
+                        $fail('Ukuran file maksimal 10MB dan maksimal 15 halaman');
+
+                        return;
+                    }
+
+                    if ($isTooLarge) {
+                        $fail('Ukuran file maksimal 10MB.');
+
+                        return;
+                    }
+
+                    if ($isTooManyPages) {
                         $fail('Jumlah halaman PDF maksimal 15 halaman.');
                     }
                 },
             ],
         ], [
             'file.mimetypes' => 'File harus berformat PDF.',
-            'file.max' => 'Ukuran file maksimal 10MB.',
         ]);
 
         $user = $request->user();
