@@ -5,7 +5,7 @@ from typing import Annotated, Literal, TypedDict
 class ReviewEngineState(TypedDict):
     # Input
     analysis_id: str
-    file_path: str
+    file_url: str
     doc_type_hint: str | None
 
     # Extraction

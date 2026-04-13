@@ -163,7 +163,7 @@ START
   │
   ▼
 ┌─────────┐
-│ extract  │  Download PDF dari S3 → Convert ke Markdown via pymupdf4llm
+│ extract  │  Download PDF dari Laravel API → Convert ke Markdown via pymupdf4llm
 └────┬─────┘
      │
      ▼
@@ -233,7 +233,7 @@ State adalah **satu-satunya data yang mengalir** melalui semua node. Setiap node
 class ReviewEngineState(TypedDict):
     # ── Input (dari Laravel) ──
     analysis_id:   str              # ID dari tabel analysis
-    file_path:     str              # Path file di S3/MinIO
+    file_url:      str              # URL endpoint internal Laravel untuk download PDF
     doc_type_hint: str | None       # Hint dari user saat upload (opsional)
 
     # ── Extraction ──
@@ -279,7 +279,7 @@ Headers:
 Body:
   {
     "analysis_id": "123",
-    "file_path": "analyses/abc123/document.pdf",
+    "file_url": "http://localhost:8000/api/v1/internal/analysis/123/file",
     "doc_type": "essay"  // hint dari user, bisa null
   }
 Response:
@@ -461,7 +461,7 @@ from pydantic import BaseModel
 
 class EvaluateRequest(BaseModel):
     analysis_id: str
-    file_path: str
+    file_url: str
     doc_type: str | None = None  # hint dari user
 
 class EvaluateResponse(BaseModel):
@@ -575,7 +575,7 @@ curl -X POST http://localhost:8001/api-agent/evaluate
 curl -X POST http://localhost:8001/api-agent/evaluate \
   -H "X-Internal-Key: super-secret-internal-key-ganti-ini" \
   -H "Content-Type: application/json" \
-  -d '{"analysis_id": "1", "file_path": "test.pdf"}'
+  -d '{"analysis_id": "1", "file_url": "http://localhost:8000/api/v1/internal/analysis/1/file"}'
 ```
 
 ---
@@ -597,7 +597,7 @@ from typing import Annotated, Literal, TypedDict
 class ReviewEngineState(TypedDict):
     # Input
     analysis_id:   str
-    file_path:     str
+    file_url:      str
     doc_type_hint: str | None
 
     # Extraction
@@ -641,22 +641,27 @@ async def extract_node(state: dict) -> dict:
     """Download PDF dan convert ke Markdown."""
     await log_step(state["analysis_id"], "extracting", "processing", "Membaca dan mengekstrak dokumen...")
     
-    # TODO: Download dari S3 terlebih dahulu (gunakan boto3)
-    # Untuk MVP, bisa test dengan local file path dulu
+    # TODO: Download file dari URL terlebih dahulu (gunakan httpx)
+    # Untuk MVP, pastikan bisa download dari endpoint internal Laravel
     
-    md_text = pymupdf4llm.to_markdown(state["file_path"])
+    import httpx
+    import tempfile
     
-    # Hitung jumlah halaman (estimasi dari page breaks)
-    import fitz
-    doc = fitz.open(state["file_path"])
-    page_count = len(doc)
-    doc.close()
+    # Download file (pseudocode)
+    # with httpx.Client() as client:
+    #     resp = client.get(state["file_url"])
+    #     simpan_ke_tmp(resp)
     
-    await log_step(state["analysis_id"], "extracting", "done", f"Dokumen berhasil diekstrak ({page_count} halaman)")
+    # md_text = pymupdf4llm.to_markdown(tmp_path)
+    # doc = fitz.open(tmp_path)
+    # page_count = len(doc)
+    # doc.close()
+    
+    await log_step(state["analysis_id"], "extracting", "done", f"Dokumen berhasil diekstrak")
     
     return {
-        "raw_markdown": md_text,
-        "page_count": page_count,
+        "raw_markdown": "", # md_text
+        "page_count": 0, # page_count
         "is_valid": True,  # akan di-validate di node berikutnya
     }
 ```
