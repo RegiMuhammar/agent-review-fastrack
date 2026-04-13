@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AnalysisController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -11,6 +12,12 @@ Route::prefix('v1')->group(function () {
         Route::middleware('auth:sanctum')->group(function () {
             Route::post('/logout', [AuthController::class, 'logout']);
             Route::get('/me', [AuthController::class, 'me']);
+
+            Route::get('/analyses', [AnalysisController::class, 'index']);
+            Route::post('/analyses', [AnalysisController::class, 'store']);
+            Route::get('/analyses/{analysis}', [AnalysisController::class, 'show']);
+            Route::get('/analyses/{analysis}/file', [AnalysisController::class, 'file']);
+            Route::delete('/analyses/{analysis}', [AnalysisController::class, 'destroy']);
         });
     });
 });
