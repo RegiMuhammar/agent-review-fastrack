@@ -129,3 +129,37 @@ export function getAnalysisFileBlob(token, analysisId) {
     responseType: 'blob',
   })
 }
+
+export function submitAnalysisFeedback(token, analysisId, payload) {
+  return request(`/auth/analysis/${analysisId}/feedback`, {
+    method: 'POST',
+    token,
+    body: payload,
+  })
+}
+
+export function listAnalysisFeedbacks(token, analysisId) {
+  return request(`/auth/analysis/${analysisId}/feedback`, {
+    method: 'GET',
+    token,
+  })
+}
+
+export function listPublicFeedbacks(options = {}) {
+  const params = new URLSearchParams()
+
+  if (options.page) {
+    params.set('page', String(options.page))
+  }
+
+  if (options.limit) {
+    params.set('limit', String(options.limit))
+  }
+
+  const queryString = params.toString()
+  const path = queryString ? `/feedbacks?${queryString}` : '/feedbacks'
+
+  return request(path, {
+    method: 'GET',
+  })
+}

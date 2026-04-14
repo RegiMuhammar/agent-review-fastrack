@@ -1,9 +1,66 @@
-import { ArrowRight, BadgeCheck, FileScan, ShieldCheck } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import {
+  ArrowRight,
+  BadgeCheck,
+  ChevronLeft,
+  ChevronRight,
+  FileScan,
+  ShieldCheck,
+  Star,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { listPublicFeedbacks } from '@/lib/api'
 
 function HomePage() {
+  const [feedbacks, setFeedbacks] = useState([])
+  const [isFeedbackLoading, setIsFeedbackLoading] = useState(true)
+  const [feedbackPagination, setFeedbackPagination] = useState({
+    current_page: 1,
+    last_page: 1,
+    per_page: 6,
+    total: 0,
+    has_more_pages: false,
+  })
+
+  async function loadFeedbacks(page = 1) {
+    setIsFeedbackLoading(true)
+
+    try {
+      const response = await listPublicFeedbacks({
+        page,
+        limit: 6,
+      })
+
+      setFeedbacks(response?.data?.feedbacks ?? [])
+      setFeedbackPagination(
+        response?.data?.pagination ?? {
+          current_page: 1,
+          last_page: 1,
+          per_page: 6,
+          total: 0,
+          has_more_pages: false,
+        }
+      )
+    } catch {
+      setFeedbacks([])
+      setFeedbackPagination({
+        current_page: 1,
+        last_page: 1,
+        per_page: 6,
+        total: 0,
+        has_more_pages: false,
+      })
+    } finally {
+      setIsFeedbackLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadFeedbacks(1)
+  }, [])
+
   return (
     <main className="min-h-screen bg-[linear-gradient(130deg,#edf1ff_0%,#f6f8ff_42%,#ffffff_100%)] text-[#2E3F86]">
       <header className="sticky top-0 z-20 border-b border-[#5E74C9]/10 bg-white/75 backdrop-blur">
@@ -116,6 +173,71 @@ function HomePage() {
               <p className="mt-2 text-sm text-[#6A7DB7]">Responsif untuk desktop/mobile dengan performa tinggi.</p>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="border-t border-[#5E74C9]/10 bg-white px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-7xl">
+          <h2 className="text-2xl font-semibold text-[#2E3F86]">Feedback Pengguna</h2>
+          <p className="mt-2 text-sm text-[#6A7DB7]">Ringkasan masukan dari pengguna Jurnal AI Fasttrack.</p>
+
+          {isFeedbackLoading ? (
+            <div className="mt-6 rounded-2xl border border-[#5E74C9]/15 bg-[#f7f9ff] p-6 text-sm text-[#6A7DB7]">
+              Memuat feedback...
+            </div>
+          ) : feedbacks.length === 0 ? (
+            <div className="mt-6 rounded-2xl border border-dashed border-[#5E74C9]/20 bg-[#f7f9ff] p-6 text-sm text-[#6A7DB7]">
+              Belum ada feedback yang ditampilkan.
+            </div>
+          ) : (
+            <div className="mt-6 grid grid-cols-[auto_1fr_auto] items-center gap-2 sm:gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 border-[#5E74C9]/20 text-[#2E3F86]"
+                disabled={isFeedbackLoading || feedbackPagination.current_page <= 1}
+                onClick={() => loadFeedbacks(feedbackPagination.current_page - 1)}
+                aria-label="Feedback sebelumnya"
+              >
+                <ChevronLeft className="size-5" />
+              </Button>
+
+              <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2">
+                {feedbacks.map((feedback, index) => (
+                  <article
+                    key={`${feedback.name}-${feedback.rating}-${index}`}
+                    className="min-w-[85%] snap-start rounded-2xl border border-[#5E74C9]/15 bg-linear-to-br from-[#ffffff] to-[#f3f7ff] p-5 shadow-[0_12px_26px_rgba(94,116,201,0.08)] sm:min-w-[48%] lg:min-w-[32%]"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-[#2E3F86]">{feedback.name}</p>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#5E74C9]/12 px-2.5 py-1 text-xs font-semibold text-[#2E3F86]">
+                        <Star className="size-3.5 fill-current" />
+                        {feedback.rating}/5
+                      </span>
+                    </div>
+                    <p className="mt-3 text-sm leading-relaxed text-[#5C70B2]">
+                      {feedback.comment || 'Tanpa komentar'}
+                    </p>
+                  </article>
+                ))}
+              </div>
+
+              <Button
+                type="button"
+                size="icon"
+                className="h-10 w-10 bg-[#5E74C9] text-white hover:bg-[#5166B8]"
+                disabled={
+                  isFeedbackLoading ||
+                  feedbackPagination.current_page >= feedbackPagination.last_page
+                }
+                onClick={() => loadFeedbacks(feedbackPagination.current_page + 1)}
+                aria-label="Feedback berikutnya"
+              >
+                <ChevronRight className="size-5" />
+              </Button>
+            </div>
+          )}
         </div>
       </section>
 
