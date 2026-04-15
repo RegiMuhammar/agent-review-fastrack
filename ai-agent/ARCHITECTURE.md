@@ -42,8 +42,8 @@ Service ini bersifat **stateless** — dia menerima request dari Laravel, mempro
 │  ┌──────────────────────────────────────────────────┐    │
 │  │           LangGraph Pipeline (async)              │    │
 │  │                                                    │    │
-│  │  extract → validate → classify                    │    │
-│  │      ↓ (conditional routing)                      │    │
+│  │  extract → validate                               │    │
+│  │      ↓ (conditional routing by doc_type input)    │    │
 │  │  essay_agent / research_agent / bizplan_agent     │    │
 │  │      ↓                                            │    │
 │  │  tool_dispatcher → score → generate               │    │
@@ -84,7 +84,6 @@ ai-agent/
 │   │   └── nodes/                # 🔧 Pipeline Nodes (setiap step)
 │   │       ├── __init__.py
 │   │       ├── extract.py        # PDF → Markdown (pymupdf4llm)
-│   │       ├── classify.py       # LLM klasifikasi doc_type
 │   │       ├── essay_agent.py    # Persona: kritikus sastra
 │   │       ├── research_agent.py # Persona: peer reviewer ICLR-standard
 │   │       ├── bizplan_agent.py  # Persona: VC analyst
@@ -124,7 +123,6 @@ ai-agent/
 ├── tests/                        # 🧪 Test Suite (tambahkan nanti)
 │   ├── __init__.py
 │   ├── test_extract.py
-│   ├── test_classify.py
 │   ├── test_graph.py
 │   └── conftest.py
 │
@@ -144,7 +142,7 @@ ai-agent/
 |-------|--------|--------|-------------|
 | **HTTP** | `app/api/` | Terima request, validasi input, return response | Fase 1 |
 | **Pipeline** | `app/graph/` | Orkestrasi seluruh pipeline review AI | Fase 1-2 |
-| **Nodes** | `app/graph/nodes/` | Setiap node = 1 step pipeline (extract, classify, score, dll) | Fase 2-3 |
+| **Nodes** | `app/graph/nodes/` | Setiap node = 1 step pipeline (extract, score, generate, dll) | Fase 2-3 |
 | **Tools** | `app/tools/` | Integrasi external: search, citations, rubric | Fase 3 |
 | **Prompts** | `app/prompts/` | System prompt untuk setiap persona reviewer | Fase 2 |
 | **Services** | `app/services/` | Client untuk berkomunikasi dengan Laravel & S3 | Fase 1 |
@@ -173,12 +171,7 @@ START
      │
      ├── is_valid = False → END (return error)
      │
-     ▼
-┌──────────┐
-│ classify │  LLM classify → doc_type (essay/research/bizplan) + confidence
-└────┬─────┘
-     │
-     │ ◄── CONDITIONAL EDGE (routing berdasarkan doc_type)
+     │ ◄── CONDITIONAL EDGE (routing berdasarkan doc_type dari input Laravel)
      │
      ├── "essay"    → ┌───────────────┐
      │                │ essay_agent   │  Siapkan context + search queries untuk essay
@@ -218,7 +211,8 @@ START
 
 ```python
 def route_by_doc_type(state: ReviewEngineState) -> str:
-    if not state["is_valid"]:
+    """doc_type sudah tersedia dari input Laravel (user pilih saat upload)."""
+    if not state.get("is_valid", False):
         return "end_with_error"
     return state["doc_type"]  # "essay" | "research" | "bizplan"
 ```
@@ -231,10 +225,10 @@ State adalah **satu-satunya data yang mengalir** melalui semua node. Setiap node
 
 ```python
 class ReviewEngineState(TypedDict):
-    # ── Input (dari Laravel) ──
+    # ── Input (dari Laravel — user memilih doc_type saat upload) ──
     analysis_id:   str              # ID dari tabel analysis
     file_url:      str              # URL endpoint internal Laravel untuk download PDF
-    doc_type_hint: str | None       # Hint dari user saat upload (opsional)
+    doc_type:      Literal["essay", "research", "bizplan"]  # Tipe dokumen (dipilih user)
 
     # ── Extraction ──
     raw_markdown:  str              # Hasil convert PDF → Markdown
@@ -242,10 +236,6 @@ class ReviewEngineState(TypedDict):
     title:         str | None       # Judul dokumen (jika terdeteksi)
     is_valid:      bool             # Lolos validasi atau tidak
     error:         str | None       # Pesan error jika gagal
-
-    # ── Classification ──
-    doc_type:             Literal["essay", "research", "bizplan"] | None
-    classify_confidence:  float     # Confidence score klasifikasi
 
     # ── Agent Preparation ──
     agent_context:   str            # Context yang disiapkan agent
@@ -280,7 +270,7 @@ Body:
   {
     "analysis_id": "123",
     "file_url": "http://localhost:8000/api/v1/internal/analysis/123/file",
-    "doc_type": "essay"  // hint dari user, bisa null
+    "doc_type": "essay"  // dipilih user saat upload (required)
   }
 Response:
   {
@@ -300,7 +290,7 @@ Headers:
 Body:
   {
     "analysis_id": "123",
-    "step": "extracting",      // extracting|classifying|preparing|searching|scoring|generating|done
+    "step": "extracting",      // extracting|preparing|searching|scoring|generating|done
     "status": "done",          // processing|done|failed
     "message": "Dokumen berhasil diekstrak (12 halaman)"
   }
@@ -575,14 +565,14 @@ curl -X POST http://localhost:8001/api-agent/evaluate
 curl -X POST http://localhost:8001/api-agent/evaluate \
   -H "X-Internal-Key: super-secret-internal-key-ganti-ini" \
   -H "Content-Type: application/json" \
-  -d '{"analysis_id": "1", "file_url": "http://localhost:8000/api/v1/internal/analysis/1/file"}'
+  -d '{"analysis_id": "1", "file_url": "http://localhost:8000/api/v1/internal/analysis/1/file", "doc_type": "essay"}'
 ```
 
 ---
 
 ## 7. Fase 2 — Core Pipeline (MVP)
 
-> **Goal**: Pipeline bisa extract PDF, classify, dan menghasilkan review sederhana untuk **satu doc_type** (mulai dari **essay**).
+> **Goal**: Pipeline bisa extract PDF dan menghasilkan review sederhana untuk **satu doc_type** (mulai dari **essay**). `doc_type` diberikan langsung oleh user via Laravel.
 > **Estimasi**: 3-5 hari
 
 ### Step 2.1 — ReviewEngineState
@@ -595,10 +585,10 @@ import operator
 from typing import Annotated, Literal, TypedDict
 
 class ReviewEngineState(TypedDict):
-    # Input
+    # Input (dari Laravel — user memilih doc_type saat upload)
     analysis_id:   str
     file_url:      str
-    doc_type_hint: str | None
+    doc_type:      Literal["essay", "research", "bizplan"]
 
     # Extraction
     raw_markdown:  str
@@ -607,9 +597,6 @@ class ReviewEngineState(TypedDict):
     is_valid:      bool
     error:         str | None
 
-    # Classification
-    doc_type:             Literal["essay", "research", "bizplan"] | None
-    classify_confidence:  float
 
     # Agent prep
     agent_context:   str
@@ -666,50 +653,7 @@ async def extract_node(state: dict) -> dict:
     }
 ```
 
-### Step 2.3 — Node: Classify
-
-**`app/graph/nodes/classify.py`**
-
-```python
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage
-from app.services.laravel_client import log_step
-from app.core.config import settings
-
-async def classify_node(state: dict) -> dict:
-    """Klasifikasi tipe dokumen menggunakan LLM."""
-    await log_step(state["analysis_id"], "classifying", "processing", "Mengidentifikasi jenis dokumen...")
-    
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, api_key=settings.OPENAI_API_KEY)
-    
-    # Ambil 3000 karakter pertama untuk klasifikasi (hemat token)
-    sample_text = state["raw_markdown"][:3000]
-    
-    response = await llm.ainvoke([
-        SystemMessage(content="""Classify this document into exactly one category:
-        - "essay": Academic essay, opinion piece, argumentative writing
-        - "research": Scientific paper, journal article, thesis
-        - "bizplan": Business plan, pitch deck, business proposal
-        
-        Respond with JSON: {"doc_type": "essay|research|bizplan", "confidence": 0.0-1.0}"""),
-        HumanMessage(content=sample_text)
-    ])
-    
-    import json
-    result = json.loads(response.content)
-    
-    # Jika user sudah memberi hint, prioritaskan hint
-    doc_type = state.get("doc_type_hint") or result["doc_type"]
-    
-    await log_step(state["analysis_id"], "classifying", "done", f"Dokumen dikenali sebagai {doc_type.upper()}")
-    
-    return {
-        "doc_type": doc_type,
-        "classify_confidence": result["confidence"],
-    }
-```
-
-### Step 2.4 — Prompts (Mulai dari Essay)
+### Step 2.3 — Prompts (Mulai dari Essay)
 
 **`app/prompts/essay.py`**
 
@@ -876,7 +820,7 @@ async def generate_node(state: dict) -> dict:
     return {"final_result": final_result}
 ```
 
-### Step 2.8 — Graph Builder
+### Step 2.7 — Graph Builder
 
 **`app/graph/builder.py`**
 
@@ -885,17 +829,16 @@ from langgraph.graph import StateGraph, END
 
 from app.graph.state import ReviewEngineState
 from app.graph.nodes.extract import extract_node
-from app.graph.nodes.classify import classify_node
 from app.graph.nodes.essay_agent import essay_agent_node
 from app.graph.nodes.score import score_node
 from app.graph.nodes.generate import generate_node
 
 def route_by_doc_type(state: ReviewEngineState) -> str:
-    """Conditional edge: route ke agent yang sesuai."""
+    """Conditional edge: route ke agent berdasarkan doc_type dari input Laravel."""
     if not state.get("is_valid", False):
         return "end_with_error"
     
-    doc_type = state.get("doc_type", "essay")
+    doc_type = state["doc_type"]  # Sudah pasti ada, required dari Laravel
     
     # MVP: hanya essay yang aktif
     route_map = {
@@ -906,12 +849,11 @@ def route_by_doc_type(state: ReviewEngineState) -> str:
     return route_map.get(doc_type, "essay_agent")
 
 def build_graph() -> StateGraph:
-    """Compile LangGraph pipeline."""
+    """Compile LangGraph pipeline (menggunakan doc_type dari input Laravel)."""
     graph = StateGraph(ReviewEngineState)
     
     # Tambahkan nodes
     graph.add_node("extract", extract_node)
-    graph.add_node("classify", classify_node)
     graph.add_node("essay_agent", essay_agent_node)
     # graph.add_node("research_agent", research_agent_node)  # Fase 3
     # graph.add_node("bizplan_agent", bizplan_agent_node)     # Fase 3
@@ -921,12 +863,9 @@ def build_graph() -> StateGraph:
     # Set entry point
     graph.set_entry_point("extract")
     
-    # Linear edges
-    graph.add_edge("extract", "classify")
-    
-    # Conditional edge setelah classify
+    # Conditional edge langsung setelah extract (doc_type dari input Laravel)
     graph.add_conditional_edges(
-        "classify",
+        "extract",
         route_by_doc_type,
         {
             "essay_agent": "essay_agent",
@@ -947,7 +886,7 @@ def build_graph() -> StateGraph:
 review_pipeline = build_graph()
 ```
 
-### Step 2.9 — Integrate Pipeline ke Route
+### Step 2.8 — Integrate Pipeline ke Route
 
 Update **`app/api/routes.py`**:
 
@@ -967,8 +906,8 @@ async def run_pipeline(request: EvaluateRequest, task_id: str):
     try:
         initial_state = {
             "analysis_id": request.analysis_id,
-            "file_path": request.file_path,
-            "doc_type_hint": request.doc_type,
+            "file_url": request.file_url,
+            "doc_type": request.doc_type,
         }
         
         result = await review_pipeline.ainvoke(initial_state)
@@ -1003,7 +942,7 @@ async def evaluate(request: EvaluateRequest, background_tasks: BackgroundTasks):
 Pada titik ini, kamu punya:
 
 - ✅ FastAPI server dengan endpoint `/evaluate`yang di-protect
-- ✅ LangGraph pipeline: extract → classify → essay_agent → score → generate
+- ✅ LangGraph pipeline: extract → essay_agent → score → generate (doc_type dari input Laravel)
 - ✅ Progress logging ke Laravel di setiap step
 - ✅ Final callback ke Laravel dengan result JSON
 - ✅ Support 1 doc_type (essay) dengan fallback
@@ -1018,7 +957,7 @@ python main.py
 curl -X POST http://localhost:8001/api/evaluate \
   -H "X-Internal-Key: super-secret-internal-key-ganti-ini" \
   -H "Content-Type: application/json" \
-  -d '{"analysis_id": "test-1", "file_path": "path/to/test.pdf"}'
+  -d '{"analysis_id": "test-1", "file_url": "path/to/test.pdf", "doc_type": "essay"}'
 ```
 
 ---
@@ -1089,7 +1028,6 @@ search results (20) → dedup (10-15) → embedding rank (5-8) → final context
 ### Step 3.9 — Unit Tests
 
 - `tests/test_extract.py` — Test PDF extraction
-- `tests/test_classify.py` — Test classification
 - `tests/test_graph.py` — Test full pipeline (mock LLM)
 
 ### ✅ Checkpoint Fase 3
@@ -1212,7 +1150,6 @@ Fase 1 (Foundation):
 Fase 2 (MVP Pipeline):
   graph/state.py       ← independen (TypedDict)
   graph/nodes/extract.py  ← depend: laravel_client.py
-  graph/nodes/classify.py ← depend: config.py, laravel_client.py
   prompts/essay.py     ← independen (constants)
   graph/nodes/essay_agent.py ← depend: laravel_client.py
   graph/nodes/score.py     ← depend: config.py, laravel_client.py, prompts/
@@ -1269,7 +1206,7 @@ Fase 3 (Multi-Agent + Tools):
 │  FASE 2: Core Pipeline / MVP (3-5 hari)                      │
 │  ☐ ReviewEngineState TypedDict                               │
 │  ☐ Node: extract (PDF → Markdown)                            │
-│  ☐ Node: classify (LLM classification)                       │
+│  ☐ doc_type routing dari input Laravel                       │
 │  ☐ Node: essay_agent (context prep)                          │
 │  ☐ Prompt: essay system prompt                               │
 │  ☐ Node: score (LLM evaluate + weighted scoring)             │

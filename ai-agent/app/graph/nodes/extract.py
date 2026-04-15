@@ -2,12 +2,13 @@
 extract.py — PDF Extraction Node
 ==================================
 Node pertama dalam LangGraph pipeline.
-Membaca file PDF dari path lokal, mengekstrak kontennya menjadi Markdown
-menggunakan pymupdf4llm, lalu menyimpan hasilnya ke state.
+Menerima file_url dari Laravel, mendownload PDF, mengekstrak kontennya
+menjadi Markdown menggunakan pymupdf4llm, lalu menyimpan hasilnya ke state.
 
-Untuk Production:
-- `file_url` di state didapat dari Laravel backend (via webhook/queue payload).
-- AI Agent mengambil file PDF dengan signed URL menggunakan Token.
+doc_type sudah diberikan oleh user saat upload di Laravel,
+sehingga agent dapat langsung memproses dokumen berdasarkan tipenya.
+
+Flow: extract → (validate) → agent → score → generate
 """
 
 import os

@@ -3,10 +3,11 @@ import operator
 from typing import Annotated, Literal, TypedDict
 
 class ReviewEngineState(TypedDict):
-    # Input
+    
+    # Input (dari Laravel — user memilih doc_type saat upload)
     analysis_id: str
     file_url: str
-    doc_type_hint: str | None
+    doc_type: Literal["essay", "research", "bizplan"]
 
     # Extraction
     raw_markdown:   str
@@ -14,10 +15,6 @@ class ReviewEngineState(TypedDict):
     title:          str | None
     is_valid:       bool
     error:          str | None
-
-    # Classification [ini bisa dicut jadi tidak perlu klasifikasi layer karna udah ada input dari user saat submit dokumne]
-    doc_type: Literal["essay", "research", "bizplan"] | None
-    classify_confidence: float
 
     # Agent prep
     agent_context: str
