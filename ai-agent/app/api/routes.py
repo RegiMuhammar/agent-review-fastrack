@@ -39,7 +39,7 @@ async def run_pipeline(request: EvaluateRequest, task_id: str):
         # Kirim error ke Laravel
         await send_callback(
             analysis_id=request.analysis_id,
-            status="failed pipeline",
+            status="failed",
             error=str(e),
         )
 
