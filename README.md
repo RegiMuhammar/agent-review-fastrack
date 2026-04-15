@@ -52,7 +52,7 @@ Setiap dokumen yang di-upload akan diproses melalui pipeline AI multi-step dan m
 | **Backend** | Laravel 11 + MySQL + Redis + Laravel Reverb (WebSocket) |
 | **AI Agent** | FastAPI + LangGraph + LangChain + pymupdf4llm |
 | **Queue** | Laravel Queue + Redis |
-| **Storage** | S3 / MinIO |
+| **Storage** | Laravel local storage |
 | **Realtime** | Laravel Reverb (WebSocket broadcast) |
 
 ---
@@ -140,7 +140,7 @@ php artisan reverb:start
 docker compose up -d
 ```
 
-> Menjalankan 8 container: frontend, backend, queue-worker, fastapi, reverb, mysql, redis, minio.
+> Menjalankan 7 container: frontend, backend, queue-worker, fastapi, reverb, mysql, redis.
 
 ---
 

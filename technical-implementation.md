@@ -17,7 +17,7 @@ Platform fullstack berbasis AI untuk mengevaluasi tiga jenis dokumen: **essay**,
 | Backend | Laravel 11 + MySQL + Redis + Laravel Reverb (WebSocket) |
 | AI Agent | FastAPI + LangGraph + LangChain + pymupdf4llm |
 | Queue | Laravel Queue + Redis (queue driver) |
-| Storage | S3 / MinIO (file PDF) |
+| Storage | Laravel local storage (file PDF) |
 | Realtime | Laravel Reverb (WebSocket broadcast) |
 
 ### Keputusan Arsitektur Utama
@@ -41,7 +41,7 @@ Queue diletakkan di **backEnd (Laravel Queue)**, bukan di ai-agent. Alasan:
        ▼
 [Laravel Backend]  ◄──────────────────────────────┐
        │                                           │
-       │ 1. Simpan file ke S3/MinIO                │
+       │ 1. Simpan file ke local storage Laravel   │
        │ 2. INSERT analysis (status=pending)       │
        │ 3. TriggerAIReviewJob::dispatch()         │ 6. Callback POST /internal/analysis/callback
        │    → masuk Redis queue                    │    (dari ai-agent setelah LangGraph selesai)
@@ -81,7 +81,7 @@ Queue diletakkan di **backEnd (Laravel Queue)**, bukan di ai-agent. Alasan:
 | Step | Siapa | Apa yang terjadi | Sync/Async |
 |---|---|---|---|
 | 1 | React | POST /api/v1/analysis (upload PDF) | Sync |
-| 2 | Laravel | Validasi, simpan S3, INSERT analysis status=pending | Sync |
+| 2 | Laravel | Validasi, simpan local storage, INSERT analysis status=pending | Sync |
 | 3 | Laravel | Dispatch TriggerAIReviewJob ke Redis queue, return response ke React | Sync → Async start |
 | 4 | React | Redirect ke /processing/{id}, subscribe WebSocket channel | — |
 | 5 | Queue Worker | Ambil job, update status=processing, POST ke FastAPI /evaluate | Background |
@@ -209,7 +209,7 @@ History Page (kapan saja)
 | user_id | BIGINT UNSIGNED | FK → users.id, NOT NULL | CASCADE DELETE |
 | doc_name | VARCHAR(255) | NOT NULL | Nama file original |
 | doc_type | ENUM('essay','research','bizplan') | NOT NULL | Ditentukan user saat upload |
-| file_path | TEXT | NOT NULL | Path di S3/MinIO |
+| file_path | TEXT | NOT NULL | Path di local storage Laravel |
 | status | ENUM('pending','processing','done','failed') | NOT NULL, DEFAULT 'pending' | — |
 | task_id | VARCHAR(100) | UNIQUE, NULL | ID dari Laravel job (untuk idempotency) |
 | result_json | JSON | NULL | Hasil lengkap dari AI pipeline |
@@ -494,7 +494,7 @@ aiAgent/
 ```
 START
   ↓
-[extract]       Download PDF dari S3 → Markdown via pymupdf4llm
+[extract]       Download PDF dari endpoint internal Laravel → Markdown via pymupdf4llm
   ↓
 [validate]      Cek panjang, halaman min 2, bahasa
   ↓ (is_valid=False → END dengan error)
@@ -826,18 +826,11 @@ services:
     image: redis:7-alpine
     ports: ["6379:6379"]
 
-  minio:
-    image: minio/minio
-    ports: ["9000:9000", "9001:9001"]
-    command: server /data --console-address ":9001"
-    volumes: ["minio_data:/data"]
-
 volumes:
   mysql_data:
-  minio_data:
 ```
 
-> **8 container total** — tidak ada Redis kedua, tidak ada Dramatiq/Celery worker terpisah.
+> **7 container total** — tidak ada Redis kedua, tidak ada Dramatiq/Celery worker terpisah.
 
 ---
 
@@ -868,7 +861,7 @@ Untuk skala awal (MVP hingga ratusan request/hari), arsitektur saat ini sudah cu
 | Lebih banyak concurrent AI jobs | Tambah instance `queue-worker` container |
 | FastAPI overload | Scale horizontal FastAPI dengan load balancer |
 | Redis single point of failure | Redis Sentinel atau Redis Cluster |
-| File storage besar | Sudah pakai S3/MinIO — tinggal tambah kapasitas |
+| File storage besar | Scale local disk/NAS atau migrasi object storage saat dibutuhkan |
 | Migrasi queue ke ai-agent | Tambah Celery di aiAgent, ubah TriggerAIReviewJob jadi non-blocking (tidak perlu rewrite LangGraph) |
 
 ---
@@ -905,14 +898,7 @@ QUEUE_CONNECTION=redis
 REDIS_HOST=redis
 REDIS_PORT=6379
 
-FILESYSTEM_DISK=s3
-AWS_ACCESS_KEY_ID=minioadmin
-AWS_SECRET_ACCESS_KEY=minioadmin
-AWS_DEFAULT_REGION=us-east-1
-AWS_BUCKET=ai-review
-AWS_URL=http://minio:9000
-AWS_ENDPOINT=http://minio:9000
-AWS_USE_PATH_STYLE_ENDPOINT=true
+FILESYSTEM_DISK=local
 
 REVERB_APP_ID=ai-review
 REVERB_APP_KEY=local-key
@@ -938,11 +924,6 @@ INTERNAL_KEY=super-secret-internal-key-ganti-ini
 
 OPENAI_API_KEY=sk-...
 TAVILY_API_KEY=tvly-...
-
-S3_ENDPOINT=http://minio:9000
-S3_ACCESS_KEY=minioadmin
-S3_SECRET_KEY=minioadmin
-S3_BUCKET=ai-review
 
 LANGCHAIN_TRACING_V2=true
 LANGCHAIN_API_KEY=ls-...
