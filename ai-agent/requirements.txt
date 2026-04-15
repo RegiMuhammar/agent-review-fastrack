@@ -11,3 +11,4 @@ httpx
 pymupdf4llm
 langsmith
 langchain-groq
+pytest
