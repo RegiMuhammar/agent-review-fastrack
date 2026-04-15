@@ -106,7 +106,7 @@ ai-agent/
 │   │
 │   ├── services/                 # 🔗 External Service Clients
 │   │   ├── __init__.py
-│   │   ├── pdf_extractor.py      # Download PDF dari S3 + extract markdown
+│   │   ├── pdf_extractor.py      # Download PDF via endpoint internal Laravel + extract markdown
 │   │   └── laravel_client.py     # HTTP client: callback + progress log
 │   │
 │   └── core/                     # ⚙️ App Configuration
@@ -145,7 +145,7 @@ ai-agent/
 | **Nodes** | `app/graph/nodes/` | Setiap node = 1 step pipeline (extract, score, generate, dll) | Fase 2-3 |
 | **Tools** | `app/tools/` | Integrasi external: search, citations, rubric | Fase 3 |
 | **Prompts** | `app/prompts/` | System prompt untuk setiap persona reviewer | Fase 2 |
-| **Services** | `app/services/` | Client untuk berkomunikasi dengan Laravel & S3 | Fase 1 |
+| **Services** | `app/services/` | Client untuk berkomunikasi dengan Laravel (callback, log, file endpoint) | Fase 1 |
 | **Core** | `app/core/` | Config, env vars, security middleware | Fase 1 |
 | **Data** | `data/rubrics/` | File rubrik statis (markdown) | Fase 2 |
 | **Tests** | `tests/` | Unit & integration tests | Fase 3-4 |
@@ -344,7 +344,6 @@ langchain
 langchain-openai
 langchain-anthropic
 tavily-python
-boto3
 ```
 
 ### Step 1.2 — Buat Folder Structure
@@ -393,12 +392,9 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""  # Opsional
     TAVILY_API_KEY: str = ""
     
-    # S3/MinIO
-    S3_ENDPOINT: str = "http://localhost:9000"
-    S3_ACCESS_KEY: str = "minioadmin"
-    S3_SECRET_KEY: str = "minioadmin"
-    S3_BUCKET: str = "ai-review"
-    
+    # File retrieval
+    # PDF diambil dari endpoint internal Laravel (local storage)
+
     # LangSmith (opsional tracing)
     LANGCHAIN_TRACING_V2: bool = False
     LANGCHAIN_API_KEY: str = ""
@@ -417,11 +413,6 @@ INTERNAL_KEY=super-secret-internal-key-ganti-ini
 
 OPENAI_API_KEY=sk-...
 TAVILY_API_KEY=tvly-...
-
-S3_ENDPOINT=http://localhost:9000
-S3_ACCESS_KEY=minioadmin
-S3_SECRET_KEY=minioadmin
-S3_BUCKET=ai-review
 
 LANGCHAIN_TRACING_V2=false
 LANGCHAIN_API_KEY=
@@ -953,7 +944,7 @@ Pada titik ini, kamu punya:
 # Jalankan server
 python main.py
 
-# Test dengan file PDF lokal (tanpa S3 dulu)
+# Test dengan file PDF dari endpoint internal Laravel (local storage)
 curl -X POST http://localhost:8001/api/evaluate \
   -H "X-Internal-Key: super-secret-internal-key-ganti-ini" \
   -H "Content-Type: application/json" \
@@ -1009,12 +1000,12 @@ curl -X POST http://localhost:8001/api/evaluate \
 - Tambahkan `tool_dispatcher` node di antara agent dan score
 - Update conditional edges
 
-### Step 3.7 — S3/MinIO Integration
+### Step 3.7 — Laravel Local Storage Integration
 
-**`app/services/pdf_extractor.py`** — Download PDF dari S3 sebelum extract:
+**`app/services/pdf_extractor.py`** — Download PDF dari endpoint internal Laravel sebelum extract:
 
 ```python
-# boto3 → download dari MinIO/S3 → temp file → pymupdf4llm
+# httpx (X-Internal-Key) → GET file_url endpoint Laravel → temp file → pymupdf4llm
 ```
 
 ### Step 3.8 — Embedding & Semantic Ranking
@@ -1034,7 +1025,7 @@ search results (20) → dedup (10-15) → embedding rank (5-8) → final context
 
 - ✅ 3 doc_types supported (essay, research, bizplan)
 - ✅ External tools (web search, citations, rubrics)
-- ✅ S3/MinIO integration untuk file download
+- ✅ Integrasi download file dari Laravel local storage
 - ✅ Semantic ranking untuk search results
 - ✅ Unit tests passing
 
@@ -1167,7 +1158,7 @@ Fase 3 (Multi-Agent + Tools):
   graph/nodes/research_agent.py ← depend: laravel_client.py
   graph/nodes/bizplan_agent.py  ← depend: laravel_client.py
   graph/nodes/tool_dispatcher.py ← depend: semua tools
-  services/pdf_extractor.py  ← depend: config.py (S3)
+  services/pdf_extractor.py  ← depend: config.py (Laravel URL + INTERNAL_KEY)
   graph/builder.py           ← UPDATE: tambah nodes baru
 ```
 
@@ -1181,10 +1172,6 @@ Fase 3 (Multi-Agent + Tools):
 | `INTERNAL_KEY` | ✅ | — | Shared secret dengan Laravel |
 | `OPENAI_API_KEY` | ✅ | — | OpenAI API key untuk LLM calls |
 | `TAVILY_API_KEY` | ⬜ Fase 3 | — | Tavily API key untuk web search |
-| `S3_ENDPOINT` | ⬜ Fase 3 | `http://localhost:9000` | MinIO/S3 endpoint |
-| `S3_ACCESS_KEY` | ⬜ Fase 3 | `minioadmin` | S3 access key |
-| `S3_SECRET_KEY` | ⬜ Fase 3 | `minioadmin` | S3 secret key |
-| `S3_BUCKET` | ⬜ Fase 3 | `ai-review` | S3 bucket name |
 | `LANGCHAIN_TRACING_V2` | ⬜ Opsional | `false` | Enable LangSmith tracing |
 | `LANGCHAIN_API_KEY` | ⬜ Opsional | — | LangSmith API key |
 
@@ -1221,7 +1208,7 @@ Fase 3 (Multi-Agent + Tools):
 │  ☐ Bizplan agent + prompt                                    │
 │  ☐ Tool dispatcher node                                      │
 │  ☐ Rubric markdown files                                     │
-│  ☐ S3/MinIO integration                                      │
+│  ☐ Laravel local storage integration                         │
 │  ☐ Embedding & semantic ranking                              │
 │  ☐ Unit tests                                                │
 │  → Deliverable: Full 3-type support + external tools         │

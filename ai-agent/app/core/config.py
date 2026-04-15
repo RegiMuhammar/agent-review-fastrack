@@ -11,13 +11,10 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""  # Opsional
     TAVILY_API_KEY: str = ""
 
-    
-    # S3/MinIO
-    S3_ENDPOINT: str = "http://localhost:9000"
-    S3_ACCESS_KEY: str = "minioadmin"
-    S3_SECRET_KEY: str = "minioadmin"
-    S3_BUCKET: str = "ai-review"
-    
+    # File retrieval
+    # PDF diambil dari endpoint internal Laravel (local storage),
+    # jadi tidak perlu konfigurasi object storage di ai-agent.
+
     # LangSmith (opsional tracing)
     LANGCHAIN_TRACING_V2: bool = False
     LANGCHAIN_API_KEY: str = ""
