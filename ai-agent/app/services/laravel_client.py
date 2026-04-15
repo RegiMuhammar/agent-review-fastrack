@@ -3,18 +3,21 @@ from app.core.config import settings
 
 async def log_step(analysis_id: str, step: str, status: str, message: str):
     """Kirim progress log ke Laravel."""
-    async with httpx.AsyncClient() as client:
-        await client.post(
-            f"{settings.LARAVEL_URL}/api/v1/internal/analysis/log",
-            headers={"X-Internal-Key": settings.INTERNAL_KEY},
-            json={
-                "analysis_id": analysis_id,
-                "step": step,
-                "status": status,
-                "message": message,
-            },
-            timeout=10.0,
-        )
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{settings.LARAVEL_URL}/api/v1/internal/analysis/log",
+                headers={"X-Internal-Key": settings.INTERNAL_KEY},
+                json={
+                    "analysis_id": analysis_id,
+                    "step": step,
+                    "status": status,
+                    "message": message,
+                },
+                timeout=10.0,
+            )
+    except Exception as e:
+        print(f"⚠️ [Peringatan Laravel Client] Gagal mengirim log '{step}': {str(e)}")
 
 async def send_callback(analysis_id: str, status: str, result: dict | None = None, error: str | None = None):
     """Kirim final result ke Laravel."""
@@ -24,10 +27,13 @@ async def send_callback(analysis_id: str, status: str, result: dict | None = Non
     if error:
         payload["error_message"] = error
     
-    async with httpx.AsyncClient() as client:
-        await client.post(
-            f"{settings.LARAVEL_URL}/api/v1/internal/analysis/callback",
-            headers={"X-Internal-Key": settings.INTERNAL_KEY},
-            json=payload,
-            timeout=30.0,
-        )
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{settings.LARAVEL_URL}/api/v1/internal/analysis/callback",
+                headers={"X-Internal-Key": settings.INTERNAL_KEY},
+                json=payload,
+                timeout=30.0,
+            )
+    except Exception as e:
+        print(f"⚠️ [Peringatan Laravel Client] Gagal mengirim hasil callback akhir: {str(e)}")
