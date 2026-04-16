@@ -938,19 +938,62 @@ Pada titik ini, kamu punya:
 - ✅ Final callback ke Laravel dengan result JSON
 - ✅ Support 1 doc_type (essay) dengan fallback
 
-**Test MVP:**
+**Panduan Integrasi Backend & Frontend (Test MVP API):**
 
+Untuk koordinasi tim, berikut alur komunikasi data antara Laravel dan AI Agent.
+
+**1. Request dari Laravel ke AI Agent (Trigger):**
+Disaat *Frontend* / *Backend* meng-upload PDF, *Backend* (Laravel) menembak URL agent via *Background Process/Queue*:
 ```bash
-# Jalankan server
-python main.py
-
-# Test dengan file PDF dari endpoint internal Laravel (local storage)
-curl -X POST http://localhost:8001/api/evaluate \
+curl -X POST http://localhost:8001/api-agent/evaluate \
   -H "X-Internal-Key: super-secret-internal-key-ganti-ini" \
   -H "Content-Type: application/json" \
-  -d '{"analysis_id": "test-1", "file_url": "path/to/test.pdf", "doc_type": "essay"}'
+  -d '{
+    "analysis_id": "99", 
+    "file_url": "http://localhost:8000/dokumen-user.pdf", 
+    "doc_type": "essay"
+  }'
 ```
 
+**2. Immediate Response dari AI Agent:**
+Sistem FastAPI langsung mengembalikan token konfirmasi agar *Request* Laravel tidak gantung *(timeout)*:
+```json
+{
+  "task_id": "abcd-1234-xyz",
+  "status": "queued"
+}
+```
+
+**3. Final Callback (Asinkronus ke Laravel):**
+Setelah 10-30 detik (bergantung beban OpenAI/Groq), agen AI memanggil URL *callback* milik Laravel *(POST /api/v1/internal/analysis/callback)* dengan membawa *payload* penuh:
+```json
+{
+  "analysis_id": "99",
+  "status": "done",
+  "result": {
+    "analysis_id": "99",
+    "doc_type": "essay",
+    "title": "Judul Dokumen",
+    "page_count": 8,
+    "score_overall": 7.95,
+    "summary": "Kesimpulan dari evaluasi dokumen...",
+    "dimensions": [
+      {
+        "key": "tesis_argumen",
+        "name": "Tesis & Argumen",
+        "score": 8.0,
+        "weight": 0.25,
+        "feedback": "Kritik dan saran terkait tesis..."
+      }
+      // ... dimensi lainnya ...
+    ],
+    "overall_feedback": "Saran perbaikan secara general...",
+    "strengths": [],
+    "improvements": [],
+    "references": []
+  }
+}
+```
 ---
 
 ## 8. Fase 3 — Tools & Multi-Agent
