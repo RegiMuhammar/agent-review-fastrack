@@ -7,16 +7,7 @@ import RegisterPage from '@/pages/auth/RegisterPage'
 import DashboardPage from '@/pages/dashboard/DashboardPage'
 import HistoryJurnalPage from '@/pages/dashboard/HistoryJurnalPage'
 import ReviewJurnalPage from '@/pages/dashboard/ReviewJurnalPage'
-
-function RootRedirect() {
-  const token = getAuthToken()
-
-  if (token) {
-    return <Navigate to="/dashboard" replace />
-  }
-
-  return <Navigate to="/login" replace />
-}
+import HomePage from '@/pages/public/HomePage'
 
 function ProtectedRoute() {
   const token = getAuthToken()
@@ -42,7 +33,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<RootRedirect />} />
+        <Route path="/" element={<HomePage />} />
 
         <Route element={<GuestRoute />}>
           <Route path="/login" element={<LoginPage />} />

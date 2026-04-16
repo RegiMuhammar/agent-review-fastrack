@@ -34,4 +34,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Analysis::class);
     }
+
+    public function feedbacks(): HasMany
+    {
+        return $this->hasMany(Feedback::class);
+    }
 }

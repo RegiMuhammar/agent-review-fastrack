@@ -53,11 +53,11 @@ function LoginPage() {
     <AuthShell
       mode="login"
       title="Selamat datang kembali"
-      subtitle="Masuk untuk melanjutkan analisis dan kelola feedback proyekmu."
+      subtitle="Masuk untuk melanjutkan analisis jurnalmu."
     >
-      <Card className="border-amber-100 bg-white/85 shadow-none">
+      <Card className="bg-white/85 shadow-none ring-0">
         <CardHeader className="px-0 sm:px-1">
-          <CardTitle className="text-base text-stone-900">Login akun</CardTitle>
+          <CardTitle className="text-base text-[#2E3F86]">Login akun</CardTitle>
           <CardDescription>
             Gunakan email dan password yang terdaftar.
           </CardDescription>
@@ -82,7 +82,7 @@ function LoginPage() {
                 <Label htmlFor="login-password">Password</Label>
                 <a
                   href="#"
-                  className="text-xs font-medium text-amber-800 transition-colors hover:text-amber-900"
+                  className="text-xs font-medium text-[#5E74C9] transition-colors hover:text-[#5166B8]"
                 >
                   Lupa password?
                 </a>
@@ -98,11 +98,11 @@ function LoginPage() {
               />
             </div>
 
-            <div className="flex items-center gap-2 text-sm text-stone-600">
+            <div className="flex items-center gap-2 text-sm text-[#6A7DB7]">
               <input
                 id="remember"
                 type="checkbox"
-                className="size-4 rounded border-amber-300 text-amber-700 focus:ring-amber-500"
+                className="size-4 rounded border-[#5E74C9]/28 text-[#5E74C9] focus:ring-[#5E74C9]"
               />
               <Label htmlFor="remember" className="text-sm font-normal">
                 Tetap masuk di perangkat ini
@@ -118,17 +118,17 @@ function LoginPage() {
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="h-10 w-full bg-amber-700 text-white hover:bg-amber-800"
+              className="h-10 w-full bg-[#5E74C9] text-white hover:bg-[#5166B8]"
             >
               {isSubmitting ? 'Memproses...' : 'Masuk'}
             </Button>
           </form>
 
-          <p className="text-center text-sm text-stone-600">
+          <p className="text-center text-sm text-[#6A7DB7]">
             Belum punya akun?{' '}
             <Link
               to="/register"
-              className="font-semibold text-amber-800 hover:text-amber-900"
+              className="font-semibold text-[#5E74C9] hover:text-[#5166B8]"
             >
               Daftar sekarang
             </Link>
