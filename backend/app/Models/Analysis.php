@@ -39,4 +39,9 @@ class Analysis extends Model
     {
         return $this->hasMany(Feedback::class);
     }
+
+    public function logs(): HasMany
+    {
+        return $this->hasMany(AnalysisLog::class);
+    }
 }

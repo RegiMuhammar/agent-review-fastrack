@@ -3,10 +3,17 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AnalysisController;
 use App\Http\Controllers\FeedbackController;
+use App\Http\Controllers\Internal\AnalysisInternalController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     Route::get('/feedbacks', [FeedbackController::class, 'publicIndex']);
+
+    Route::middleware('internal.key')->prefix('internal')->group(function () {
+        Route::get('/analyses/{analysis}/file', [AnalysisInternalController::class, 'file']);
+        Route::post('/analysis/log', [AnalysisInternalController::class, 'log']);
+        Route::post('/analysis/callback', [AnalysisInternalController::class, 'callback']);
+    });
 
     Route::prefix('auth')->group(function () {
         Route::post('/register', [AuthController::class, 'register']);

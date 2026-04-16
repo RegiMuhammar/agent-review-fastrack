@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    'ai_agent' => [
+        'url' => env('AI_AGENT_URL', 'http://127.0.0.1:8001'),
+        'timeout' => env('AI_AGENT_TIMEOUT', 600),
+    ],
+
+    'internal' => [
+        'key' => env('INTERNAL_KEY', 'super-secret-internal-key'),
+        'base_url' => env('INTERNAL_BASE_URL', env('APP_URL', 'http://127.0.0.1:8000')),
+    ],
+
 ];

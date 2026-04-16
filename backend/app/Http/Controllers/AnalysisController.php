@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\TriggerAiReviewJob;
 use App\Models\Analysis;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -88,6 +89,8 @@ class AnalysisController extends Controller
             'file_path' => $storedPath,
             'status' => 'pending',
         ]);
+
+        TriggerAiReviewJob::dispatch($analysis->id)->onQueue('ai-review');
 
         return response()->json([
             'success' => true,
