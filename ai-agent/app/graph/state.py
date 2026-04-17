@@ -34,6 +34,9 @@ class ReviewEngineState(TypedDict):
     agent_context: str
     search_queries: dict[str, list[str]]   # {"semanticscholar": [...], "arxiv": [...], "tavily": [...]}
 
+    # Search (Fase 5 — diisi oleh search_execute node)
+    search_results: list[dict]             # Hasil search terdedup dari semua sumber
+
     # Tools
     tool_results: Annotated[list[dict], operator.add]
 
