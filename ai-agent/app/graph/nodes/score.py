@@ -4,6 +4,7 @@ from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from app.prompts.essay import ESSAY_SYSTEM_PROMPT
+from app.prompts.research import RESEARCH_SYSTEM_PROMPT
 from app.core.config import settings
 from app.graph.state import ReviewEngineState
 
@@ -53,9 +54,8 @@ async def score_node(state: ReviewEngineState) -> dict:
     # 2. Pilih system prompt yang sesuai dengan tipe dokumen
     prompt_map = {
         "essay": ESSAY_SYSTEM_PROMPT,
-        # Nanti di Fase 3 kita akan aktifkan untuk tipe lainnya:
-        # "research": RESEARCH_SYSTEM_PROMPT,
-        # "bizplan": BIZPLAN_SYSTEM_PROMPT,
+        "research": RESEARCH_SYSTEM_PROMPT,  # Fase 2: prompt khusus research
+        # "bizplan": BIZPLAN_SYSTEM_PROMPT,  # Fase berikutnya
     }
     
     system_prompt = prompt_map.get(doc_type, ESSAY_SYSTEM_PROMPT)

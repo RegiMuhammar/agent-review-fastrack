@@ -5,6 +5,7 @@ from app.graph.state import ReviewEngineState
 from app.graph.nodes.extract import extract_node
 from app.graph.nodes.metadata_extract import metadata_extract_node
 from app.graph.nodes.essay_agent import essay_agent_node
+from app.graph.nodes.research_agent import research_agent_node
 from app.graph.nodes.score import score_node
 from app.graph.nodes.generate import generate_node
 
@@ -19,19 +20,16 @@ def route_after_extract(state: ReviewEngineState) -> Literal["metadata_extract",
     return "metadata_extract"
 
 
-def route_by_doc_type(state: ReviewEngineState) -> Literal["essay_agent", "end_with_error"]:
+def route_by_doc_type(state: ReviewEngineState) -> Literal["essay_agent", "research_agent"]:
     """
     Conditional edge setelah metadata_extract: rute berdasarkan 'doc_type'.
     """
-    # Check state doc_type, default = "essay"
     doc_type = state.get("doc_type", "essay")
     
-    # Mapping untuk MVP, semuanya diarahkan ke 'essay_agent'
-    # Nanti di Fase 2 kita akan tambahkan research_agent
     route_map = {
         "essay": "essay_agent",
-        "research": "essay_agent",    # fallback ke essay (Fase 2)
-        "bizplan": "essay_agent",     # fallback ke essay (Fase 2)
+        "research": "research_agent",  # Fase 2: jalur research terpisah
+        "bizplan": "essay_agent",      # fallback ke essay (belum ada bizplan_agent)
     }
     return route_map.get(doc_type, "essay_agent")
 
@@ -43,7 +41,7 @@ def build_graph() -> StateGraph:
     graph.add_node("extract", extract_node)
     graph.add_node("metadata_extract", metadata_extract_node)  # Fase 1
     graph.add_node("essay_agent", essay_agent_node)
-    # graph.add_node("research_agent", research_agent_node)  # Nanti Fase 2
+    graph.add_node("research_agent", research_agent_node)      # Fase 2
     graph.add_node("score", score_node)
     graph.add_node("generate", generate_node)
     
@@ -67,13 +65,13 @@ def build_graph() -> StateGraph:
         route_by_doc_type,
         {
             "essay_agent": "essay_agent",
-            # "research_agent": "research_agent",  # Fase 2
-            "end_with_error": END,
+            "research_agent": "research_agent",  # Fase 2
         }
     )
     
-    # 5. Alur Lurus Agent -> Score -> Generate
+    # 5. Kedua jalur agent → score → generate
     graph.add_edge("essay_agent", "score")
+    graph.add_edge("research_agent", "score")  # Fase 2
     graph.add_edge("score", "generate")
     graph.add_edge("generate", END)
     
