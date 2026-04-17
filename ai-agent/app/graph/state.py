@@ -37,6 +37,10 @@ class ReviewEngineState(TypedDict):
     # Search (Fase 5 — diisi oleh search_execute node)
     search_results: list[dict]             # Hasil search terdedup dari semua sumber
 
+    # Ranking (Fase 6 — diisi oleh search_rank node)
+    ranked_results:  list[dict]            # Semua hasil search setelah diranking
+    top_references:  list[dict]            # 3-5 referensi terbaik untuk context LLM
+
     # Tools
     tool_results: Annotated[list[dict], operator.add]
 
