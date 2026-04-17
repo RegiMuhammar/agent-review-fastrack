@@ -16,6 +16,13 @@ class ReviewEngineState(TypedDict):
     is_valid:       bool
     error:          str | None
 
+    # Metadata (Fase 1 — diisi oleh metadata_extract node)
+    abstract:       str
+    authors:        list[str]
+    keywords:       list[str]
+    document_head:  str          # ~3000-4000 karakter awal dokumen
+    document_tail:  str          # ~1000-2000 karakter akhir dokumen
+
     # Agent prep
     agent_context: str
     search_queries: list[str]
