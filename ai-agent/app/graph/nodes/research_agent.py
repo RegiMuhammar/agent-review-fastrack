@@ -140,8 +140,8 @@ SELECTED DOCUMENT EXCERPT
 {evidence_excerpt}
 """.strip()
 
-    # Placeholder search queries — akan diisi di Fase 4
-    search_queries: list[str] = []
+    # search_queries diisi oleh retrieval_prep (Fase 4), bukan di sini
+    search_queries: dict[str, list[str]] = {}
 
     context_len = len(agent_context)
     print(f"[research_agent] Context dibangun: {context_len} chars")

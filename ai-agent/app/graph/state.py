@@ -32,7 +32,7 @@ class ReviewEngineState(TypedDict):
 
     # Agent prep
     agent_context: str
-    search_queries: list[str]
+    search_queries: dict[str, list[str]]   # {"semanticscholar": [...], "arxiv": [...], "tavily": [...]}
 
     # Tools
     tool_results: Annotated[list[dict], operator.add]

@@ -6,6 +6,7 @@ from app.graph.nodes.extract import extract_node
 from app.graph.nodes.metadata_extract import metadata_extract_node
 from app.graph.nodes.essay_agent import essay_agent_node
 from app.graph.nodes.document_profile import document_profile_node
+from app.graph.nodes.retrieval_prep import retrieval_prep_node
 from app.graph.nodes.research_agent import research_agent_node
 from app.graph.nodes.score import score_node
 from app.graph.nodes.generate import generate_node
@@ -45,6 +46,7 @@ def build_graph() -> StateGraph:
     graph.add_node("metadata_extract", metadata_extract_node)  # Fase 1
     graph.add_node("essay_agent", essay_agent_node)
     graph.add_node("document_profile", document_profile_node)  # Fase 3
+    graph.add_node("retrieval_prep", retrieval_prep_node)      # Fase 4
     graph.add_node("research_agent", research_agent_node)      # Fase 2
     graph.add_node("score", score_node)
     graph.add_node("generate", generate_node)
@@ -53,7 +55,6 @@ def build_graph() -> StateGraph:
     graph.set_entry_point("extract")
     
     # 3. Conditional Edge setelah extract
-    # Jika valid → metadata_extract, jika gagal → END
     graph.add_conditional_edges(
         "extract",
         route_after_extract,
@@ -69,12 +70,13 @@ def build_graph() -> StateGraph:
         route_by_doc_type,
         {
             "essay_agent": "essay_agent",
-            "document_profile": "document_profile",  # Fase 3: research path
+            "document_profile": "document_profile",
         }
     )
     
-    # 5. Jalur research: document_profile → research_agent
-    graph.add_edge("document_profile", "research_agent")  # Fase 3
+    # 5. Jalur research: document_profile → retrieval_prep → research_agent
+    graph.add_edge("document_profile", "retrieval_prep")   # Fase 4
+    graph.add_edge("retrieval_prep", "research_agent")     # Fase 4
     
     # 6. Semua jalur agent → score → generate
     graph.add_edge("essay_agent", "score")
