@@ -1,16 +1,17 @@
 """
-research_agent.py — Research Agent Node (Fase 2)
+research_agent.py — Research Agent Node (Fase 2+3)
 ==================================================
 Node khusus untuk doc_type="research".
 Membangun agent_context dari metadata terstruktur (title, abstract, keywords)
-ditambah potongan dokumen yang lebih terarah, bukan raw_markdown[:6000] mentah.
+ditambah profil dokumen (domain, paper_type, retrieval_focus) dan
+potongan dokumen yang lebih terarah, bukan raw_markdown[:6000] mentah.
 
 Perbedaan utama dengan essay_agent:
-- Context dibangun dari metadata + excerpt berbasis section, bukan potongan kasar.
+- Context dibangun dari metadata + profil + excerpt berbasis section.
 - search_queries disiapkan sebagai placeholder untuk Fase 4.
 - Output state siap digunakan oleh node search & retrieval di fase berikutnya.
 
-Flow: extract → metadata_extract → route("research") → research_agent → score → generate
+Flow: extract → metadata_extract → document_profile → research_agent → score → generate
 """
 
 from app.graph.state import ReviewEngineState
@@ -39,6 +40,12 @@ def _build_metadata_block(state: ReviewEngineState) -> str:
     authors = state.get("authors") or []
     keywords = state.get("keywords") or []
 
+    # Profiling data (Fase 3)
+    domain = state.get("domain") or ""
+    sub_domain = state.get("sub_domain") or ""
+    paper_type = state.get("paper_type") or ""
+    retrieval_focus = state.get("retrieval_focus") or []
+
     lines = [
         "PAPER METADATA",
         f"- Title: {title}",
@@ -49,6 +56,16 @@ def _build_metadata_block(state: ReviewEngineState) -> str:
 
     if keywords:
         lines.append(f"- Keywords: {', '.join(keywords)}")
+
+    if domain:
+        domain_str = f"{domain}/{sub_domain}" if sub_domain else domain
+        lines.append(f"- Domain: {domain_str}")
+
+    if paper_type:
+        lines.append(f"- Paper type: {paper_type}")
+
+    if retrieval_focus:
+        lines.append(f"- Retrieval focus: {', '.join(retrieval_focus)}")
 
     if abstract:
         lines.append(f"\nABSTRACT\n{abstract}")
@@ -98,6 +115,7 @@ async def research_agent_node(state: ReviewEngineState) -> dict:
 
     Input dari state:
         - title, abstract, authors, keywords (dari metadata_extract)
+        - domain, sub_domain, paper_type, retrieval_focus (dari document_profile)
         - document_head, document_tail (dari metadata_extract)
         - raw_markdown (fallback jika head/tail belum tersedia)
         - analysis_id (untuk logging)
@@ -128,6 +146,7 @@ SELECTED DOCUMENT EXCERPT
     context_len = len(agent_context)
     print(f"[research_agent] Context dibangun: {context_len} chars")
     print(f"[research_agent] Metadata: title='{(state.get('title') or '')[:60]}'")
+    print(f"[research_agent] Profile: {state.get('domain', '?')}/{state.get('sub_domain', '?')} ({state.get('paper_type', '?')})")
     print(f"[research_agent] Abstract: {len(state.get('abstract') or '')} chars")
     print(f"[research_agent] Search queries: {len(search_queries)} (placeholder)")
 

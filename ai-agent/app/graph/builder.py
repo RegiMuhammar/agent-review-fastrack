@@ -5,6 +5,7 @@ from app.graph.state import ReviewEngineState
 from app.graph.nodes.extract import extract_node
 from app.graph.nodes.metadata_extract import metadata_extract_node
 from app.graph.nodes.essay_agent import essay_agent_node
+from app.graph.nodes.document_profile import document_profile_node
 from app.graph.nodes.research_agent import research_agent_node
 from app.graph.nodes.score import score_node
 from app.graph.nodes.generate import generate_node
@@ -20,16 +21,18 @@ def route_after_extract(state: ReviewEngineState) -> Literal["metadata_extract",
     return "metadata_extract"
 
 
-def route_by_doc_type(state: ReviewEngineState) -> Literal["essay_agent", "research_agent"]:
+def route_by_doc_type(state: ReviewEngineState) -> Literal["essay_agent", "document_profile"]:
     """
     Conditional edge setelah metadata_extract: rute berdasarkan 'doc_type'.
+    - essay/bizplan → langsung ke essay_agent
+    - research → document_profile → research_agent (Fase 3)
     """
     doc_type = state.get("doc_type", "essay")
     
     route_map = {
         "essay": "essay_agent",
-        "research": "research_agent",  # Fase 2: jalur research terpisah
-        "bizplan": "essay_agent",      # fallback ke essay (belum ada bizplan_agent)
+        "research": "document_profile",  # Fase 3: profiling dulu sebelum research_agent
+        "bizplan": "essay_agent",        # fallback ke essay (belum ada bizplan_agent)
     }
     return route_map.get(doc_type, "essay_agent")
 
@@ -41,6 +44,7 @@ def build_graph() -> StateGraph:
     graph.add_node("extract", extract_node)
     graph.add_node("metadata_extract", metadata_extract_node)  # Fase 1
     graph.add_node("essay_agent", essay_agent_node)
+    graph.add_node("document_profile", document_profile_node)  # Fase 3
     graph.add_node("research_agent", research_agent_node)      # Fase 2
     graph.add_node("score", score_node)
     graph.add_node("generate", generate_node)
@@ -65,13 +69,16 @@ def build_graph() -> StateGraph:
         route_by_doc_type,
         {
             "essay_agent": "essay_agent",
-            "research_agent": "research_agent",  # Fase 2
+            "document_profile": "document_profile",  # Fase 3: research path
         }
     )
     
-    # 5. Kedua jalur agent → score → generate
+    # 5. Jalur research: document_profile → research_agent
+    graph.add_edge("document_profile", "research_agent")  # Fase 3
+    
+    # 6. Semua jalur agent → score → generate
     graph.add_edge("essay_agent", "score")
-    graph.add_edge("research_agent", "score")  # Fase 2
+    graph.add_edge("research_agent", "score")
     graph.add_edge("score", "generate")
     graph.add_edge("generate", END)
     
