@@ -51,6 +51,8 @@ class AnalysisInternalController extends Controller
         ]);
 
         $analysis = Analysis::query()->findOrFail($validated['analysis_id']);
+        $rawErrorMessage = (string) ($validated['error_message'] ?? '');
+        $friendlyErrorMessage = $this->toFriendlyErrorMessage($rawErrorMessage);
 
         if ($validated['status'] === 'done') {
             $result = $validated['result'] ?? [];
@@ -81,7 +83,7 @@ class AnalysisInternalController extends Controller
             'status' => 'failed',
             'result_json' => null,
             'score_overall' => null,
-            'error_message' => $validated['error_message'] ?? 'Proses analisis gagal.',
+            'error_message' => $friendlyErrorMessage,
             'completed_at' => now(),
         ]);
 
@@ -89,13 +91,38 @@ class AnalysisInternalController extends Controller
             'analysis_id' => $analysis->id,
             'step' => 'failed',
             'status' => 'failed',
-            'message' => $validated['error_message'] ?? 'Proses analisis gagal.',
+            'message' => $friendlyErrorMessage,
+            'metadata_json' => $rawErrorMessage !== '' ? [
+                'raw_error' => $rawErrorMessage,
+            ] : null,
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Analysis callback processed.',
         ]);
+    }
+
+    private function toFriendlyErrorMessage(string $rawMessage): string
+    {
+        $trimmed = trim($rawMessage);
+
+        if ($trimmed === '') {
+            return 'Proses analisis gagal. Silakan coba lagi beberapa saat.';
+        }
+
+        $lowered = strtolower($trimmed);
+        if (str_contains($lowered, 'groq_api_key') || str_contains($lowered, 'api_key client option must be set')) {
+            return 'Layanan AI belum terkonfigurasi. Silakan hubungi admin untuk mengatur API key.';
+        }
+
+        $firstLine = trim(explode("\n", $trimmed)[0]);
+
+        if (mb_strlen($firstLine) > 220) {
+            return mb_substr($firstLine, 0, 217).'...';
+        }
+
+        return $firstLine;
     }
 
     public function file(int $analysis): BinaryFileResponse

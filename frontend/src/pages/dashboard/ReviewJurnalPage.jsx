@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import AlertPopup from '@/components/ui/alert-popup'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createAnalysis } from '@/lib/api'
@@ -25,6 +26,11 @@ function ReviewJurnalPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [alertState, setAlertState] = useState({
+    open: false,
+    title: '',
+    description: '',
+  })
 
   function handleSelectFile(file) {
     if (!file) {
@@ -65,11 +71,22 @@ function ReviewJurnalPage() {
     setSuccessMessage('')
 
     try {
-      await createAnalysis(token, {
+      const response = await createAnalysis(token, {
         docName: namaJurnal,
         docType: tipeJurnal,
         file: uploadFile,
       })
+
+      const createdAnalysisId = response?.data?.analysis?.id
+
+      if (createdAnalysisId) {
+        setAlertState({
+          open: true,
+          title: 'Upload Berhasil',
+          description: 'Dokumen berhasil diupload. Anda akan diarahkan ke halaman history.',
+        })
+        return
+      }
 
       setNamaJurnal('')
       setTipeJurnal('essay')
@@ -88,6 +105,17 @@ function ReviewJurnalPage() {
 
   return (
     <div className="mx-auto w-full max-w-4xl">
+      <AlertPopup
+        open={alertState.open}
+        title={alertState.title}
+        description={alertState.description}
+        variant="success"
+        onConfirm={() => {
+          setAlertState({ open: false, title: '', description: '' })
+          navigate('/history-jurnal')
+        }}
+      />
+
       <Card className="border-[#5E74C9]/16 bg-white/85 shadow-[0_20px_60px_rgba(94,116,201,0.11)] backdrop-blur">
         <CardHeader>
           <CardTitle className="text-xl text-[#2E3F86]">Review Jurnal</CardTitle>

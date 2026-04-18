@@ -118,6 +118,28 @@ class AnalysisController extends Controller
         ]);
     }
 
+    public function logs(Request $request, int $analysis): JsonResponse
+    {
+        $analysisData = Analysis::query()
+            ->where('user_id', $request->user()->id)
+            ->whereKey($analysis)
+            ->firstOrFail();
+
+        $logs = $analysisData->logs()
+            ->orderBy('id')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Log analisis berhasil diambil.',
+            'data' => [
+                'analysis_id' => $analysisData->id,
+                'status' => $analysisData->status,
+                'logs' => $logs,
+            ],
+        ]);
+    }
+
     public function file(Request $request, int $analysis): BinaryFileResponse
     {
         $analysisData = Analysis::query()

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ArrowRight,
   BadgeCheck,
@@ -16,50 +16,67 @@ import { listPublicFeedbacks } from '@/lib/api'
 function HomePage() {
   const [feedbacks, setFeedbacks] = useState([])
   const [isFeedbackLoading, setIsFeedbackLoading] = useState(true)
-  const [feedbackPagination, setFeedbackPagination] = useState({
-    current_page: 1,
-    last_page: 1,
-    per_page: 6,
-    total: 0,
-    has_more_pages: false,
-  })
+  const feedbackCarouselRef = useRef(null)
 
-  async function loadFeedbacks(page = 1) {
+  function moveFeedbackCarousel(direction) {
+    const container = feedbackCarouselRef.current
+
+    if (!container) {
+      return
+    }
+
+    const scrollAmount = container.clientWidth * 0.9
+    const maxScrollLeft = Math.max(container.scrollWidth - container.clientWidth, 0)
+    const isAtStart = container.scrollLeft <= 8
+    const isAtEnd = container.scrollLeft >= maxScrollLeft - 8
+
+    if (direction === 'prev') {
+      if (isAtStart) {
+        container.scrollTo({ left: maxScrollLeft, behavior: 'smooth' })
+        return
+      }
+
+      container.scrollBy({ left: -scrollAmount, behavior: 'smooth' })
+      return
+    }
+
+    if (isAtEnd) {
+      container.scrollTo({ left: 0, behavior: 'smooth' })
+      return
+    }
+
+    container.scrollBy({ left: scrollAmount, behavior: 'smooth' })
+  }
+
+  async function loadFeedbacks() {
     setIsFeedbackLoading(true)
 
     try {
-      const response = await listPublicFeedbacks({
-        page,
-        limit: 6,
-      })
+      const response = await listPublicFeedbacks({ page: 1, limit: 18 })
 
       setFeedbacks(response?.data?.feedbacks ?? [])
-      setFeedbackPagination(
-        response?.data?.pagination ?? {
-          current_page: 1,
-          last_page: 1,
-          per_page: 6,
-          total: 0,
-          has_more_pages: false,
-        }
-      )
     } catch {
       setFeedbacks([])
-      setFeedbackPagination({
-        current_page: 1,
-        last_page: 1,
-        per_page: 6,
-        total: 0,
-        has_more_pages: false,
-      })
     } finally {
       setIsFeedbackLoading(false)
     }
   }
 
   useEffect(() => {
-    loadFeedbacks(1)
+    loadFeedbacks()
   }, [])
+
+  useEffect(() => {
+    if (feedbacks.length <= 1) {
+      return
+    }
+
+    const timer = window.setInterval(() => {
+      moveFeedbackCarousel('next')
+    }, 4000)
+
+    return () => window.clearInterval(timer)
+  }, [feedbacks.length])
 
   return (
     <main className="min-h-screen bg-[linear-gradient(130deg,#edf1ff_0%,#f6f8ff_42%,#ffffff_100%)] text-[#2E3F86]">
@@ -196,14 +213,17 @@ function HomePage() {
                 variant="outline"
                 size="icon"
                 className="h-10 w-10 border-[#5E74C9]/20 text-[#2E3F86]"
-                disabled={isFeedbackLoading || feedbackPagination.current_page <= 1}
-                onClick={() => loadFeedbacks(feedbackPagination.current_page - 1)}
+                disabled={isFeedbackLoading || feedbacks.length <= 1}
+                onClick={() => moveFeedbackCarousel('prev')}
                 aria-label="Feedback sebelumnya"
               >
                 <ChevronLeft className="size-5" />
               </Button>
 
-              <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2">
+              <div
+                ref={feedbackCarouselRef}
+                className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              >
                 {feedbacks.map((feedback, index) => (
                   <article
                     key={`${feedback.name}-${feedback.rating}-${index}`}
@@ -227,11 +247,8 @@ function HomePage() {
                 type="button"
                 size="icon"
                 className="h-10 w-10 bg-[#5E74C9] text-white hover:bg-[#5166B8]"
-                disabled={
-                  isFeedbackLoading ||
-                  feedbackPagination.current_page >= feedbackPagination.last_page
-                }
-                onClick={() => loadFeedbacks(feedbackPagination.current_page + 1)}
+                disabled={isFeedbackLoading || feedbacks.length <= 1}
+                onClick={() => moveFeedbackCarousel('next')}
                 aria-label="Feedback berikutnya"
               >
                 <ChevronRight className="size-5" />

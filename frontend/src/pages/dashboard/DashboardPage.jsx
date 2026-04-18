@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { FileText, LogOut, Paperclip, Sparkles } from 'lucide-react'
+import { FileText, Paperclip, Sparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
@@ -10,9 +10,10 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import AlertPopup from '@/components/ui/alert-popup'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { createAnalysis, fetchMe, logout } from '@/lib/api'
+import { createAnalysis, fetchMe } from '@/lib/api'
 import { clearAuthSession, getAuthToken, getAuthUser, setAuthSession } from '@/lib/auth'
 
 function DashboardPage() {
@@ -27,8 +28,12 @@ function DashboardPage() {
   const [formErrorMessage, setFormErrorMessage] = useState('')
   const [formSuccessMessage, setFormSuccessMessage] = useState('')
   const [isFetchingProfile, setIsFetchingProfile] = useState(true)
-  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [alertState, setAlertState] = useState({
+    open: false,
+    title: '',
+    description: '',
+  })
 
   function handleSelectFile(file) {
     if (!file) {
@@ -80,23 +85,6 @@ function DashboardPage() {
     loadProfile()
   }, [navigate])
 
-  async function handleLogout() {
-    const token = getAuthToken()
-    setIsLoggingOut(true)
-
-    try {
-      if (token) {
-        await logout(token)
-      }
-    } catch {
-      // Even if API logout fails, local session should still be cleared.
-    } finally {
-      clearAuthSession()
-      navigate('/login', { replace: true })
-      setIsLoggingOut(false)
-    }
-  }
-
   async function handleSubmitJurnal(event) {
     event.preventDefault()
 
@@ -117,11 +105,22 @@ function DashboardPage() {
     setFormSuccessMessage('')
 
     try {
-      await createAnalysis(token, {
+      const response = await createAnalysis(token, {
         docName: namaJurnal,
         docType: tipeJurnal,
         file: uploadFile,
       })
+
+      const createdAnalysisId = response?.data?.analysis?.id
+
+      if (createdAnalysisId) {
+        setAlertState({
+          open: true,
+          title: 'Upload Berhasil',
+          description: 'Dokumen berhasil diupload. Anda akan diarahkan ke halaman history.',
+        })
+        return
+      }
 
       setNamaJurnal('')
       setTipeJurnal('essay')
@@ -140,6 +139,17 @@ function DashboardPage() {
 
   return (
     <main className="w-full">
+      <AlertPopup
+        open={alertState.open}
+        title={alertState.title}
+        description={alertState.description}
+        variant="success"
+        onConfirm={() => {
+          setAlertState({ open: false, title: '', description: '' })
+          navigate('/history-jurnal')
+        }}
+      />
+
       <div className="flex w-full flex-col gap-6">
         <header className="flex flex-col items-start justify-between gap-4 rounded-3xl border border-[#5E74C9]/16 bg-white/85 p-6 shadow-[0_20px_60px_rgba(94,116,201,0.11)] backdrop-blur sm:flex-row sm:items-center">
           <div>
@@ -154,16 +164,6 @@ function DashboardPage() {
               Selamat datang kembali di Jurnal AI Fasttrack.
             </p>
           </div>
-
-          <Button
-            type="button"
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="h-10 bg-[#5E74C9] text-white hover:bg-[#5166B8]"
-          >
-            <LogOut className="mr-1 size-4" />
-            {isLoggingOut ? 'Keluar...' : 'Logout'}
-          </Button>
         </header>
 
         <Card className="border-[#5E74C9]/16 bg-white/85 shadow-[0_20px_60px_rgba(94,116,201,0.11)] backdrop-blur">
