@@ -168,8 +168,8 @@ class TestNodeFallbacks:
             "score_overall": 7.5,
             "summary": "Good essay",
             "dimensions_feedback": [
-                {"key": "tesis_argumen", "label": "Tesis", "score": 8.0, "feedback": "Bagus"},
-                {"key": "gaya_bahasa", "label": "Gaya", "score": 5.0, "feedback": "Perlu perbaikan"},
+                {"key": "thesis_clarity", "label": "Tesis", "score": 8.0, "feedback": "Bagus"},
+                {"key": "writing_style_clarity", "label": "Gaya", "score": 5.0, "feedback": "Perlu perbaikan"},
             ],
             "overall_feedback": "Overall OK",
         }  # type: ignore

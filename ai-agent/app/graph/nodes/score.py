@@ -12,12 +12,12 @@ from app.graph.state import ReviewEngineState
 
 DIMENSION_WEIGHTS = {
     "essay": {
-        "tesis_argumen": 0.25, 
-        "struktur_koherensi": 0.20,
-        "bukti_referensi": 0.20, 
-        "gaya_bahasa": 0.15,
-        "orisinalitas": 0.10, 
-        "simpulan": 0.10,
+        "thesis_clarity": 0.20,
+        "argument_coherence": 0.25,
+        "evidence_quality": 0.20,
+        "structure_organization": 0.15,
+        "writing_style_clarity": 0.10,
+        "citation_integrity": 0.10,
     },
     "research": {
         "novelty": 0.25, "signifikansi": 0.20,
