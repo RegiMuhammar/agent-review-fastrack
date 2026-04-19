@@ -106,15 +106,15 @@ async def generate_node(state: ReviewEngineState) -> dict:
         "improvements": improvements,
     }
 
-    # ─── Research enrichment (Fase 9) ─────────────────────────────────────
-    if doc_type == "research":
-        # Metadata
-        final_result["metadata"] = {
-            "authors": state.get("authors", []),
-            "keywords": state.get("keywords", []),
-            "abstract": (state.get("abstract") or "")[:500],
-        }
+    # ─── Enriched metadata (Fase 9 - Always include if available) ─────────
+    final_result["metadata"] = {
+        "authors": state.get("authors", []),
+        "keywords": state.get("keywords", []),
+        "abstract": (state.get("abstract") or "")[:500],
+    }
 
+    # ─── Research specific enrichment (Profile & References) ──────────────
+    if doc_type == "research":
         # Profile
         final_result["profile"] = {
             "domain": state.get("domain"),
@@ -143,6 +143,10 @@ async def generate_node(state: ReviewEngineState) -> dict:
     else:
         # Essay/bizplan: references kosong tapi field tetap ada
         final_result["references"] = []
+        final_result["profile"] = {
+            "domain": state.get("domain"),
+            "sub_domain": state.get("sub_domain"),
+        }
 
     _safe_log(analysis_id, "generating", "done", "Laporan evaluasi berhasil disusun.")
     print(f"[generate_node] Selesai — score: {final_result['score_overall']}/10, "
