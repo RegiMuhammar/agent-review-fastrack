@@ -124,7 +124,7 @@ function HistoryJurnalPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
+    <div className="flex w-full flex-col gap-4">
       <AlertPopup
         open={deleteTargetId !== null}
         title="Hapus Dokumen?"

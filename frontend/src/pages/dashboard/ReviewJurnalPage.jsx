@@ -104,7 +104,7 @@ function ReviewJurnalPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl">
+    <div className="w-full">
       <AlertPopup
         open={alertState.open}
         title={alertState.title}
