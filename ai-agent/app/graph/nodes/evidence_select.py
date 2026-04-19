@@ -1,18 +1,19 @@
 """
-evidence_select.py — Evidence Selection Node (Fase 7)
-======================================================
-Membangun `review_context` yang tajam dan ringkas untuk LLM scoring.
+evidence_select.py - Evidence Selection Node (Fase 7)
+=====================================================
+Membangun review_context yang tajam dan ringkas untuk LLM scoring.
 
 Strategi evidence extraction:
 1. Section detection via regex pada raw_markdown
    - Prioritas: Abstract, Introduction, Method, Results, Conclusion
+   - Handle format pymupdf4llm: ## **1 Introduction**, ## I. INTRODUCTION
 2. Jika section parsing gagal, fallback ke head/middle/tail excerpt
 3. Gabungkan evidence chunks dengan metadata + top_references
-4. Hasilkan `review_context` yang siap dikirim ke score node
+4. Hasilkan review_context yang siap dikirim ke score node
 
-Target ukuran review_context: ~4000-6000 chars (vs raw_markdown yang bisa 50K+)
+Target ukuran review_context: ~4000-6000 chars (vs raw_markdown 50K+)
 
-Flow: ... → search_rank → evidence_select → research_agent → score → ...
+Flow: ... -> search_rank -> evidence_select -> research_agent -> score -> ...
 """
 
 import re
@@ -22,7 +23,7 @@ from app.graph.state import ReviewEngineState
 
 logger = logging.getLogger(__name__)
 
-# ── CONSTANTS ────────────────────────────────────────────────────────────────
+# -- CONSTANTS ----------------------------------------------------------------
 
 # Budget karakter per section (total target ~3500 chars untuk evidence)
 SECTION_BUDGETS = {
@@ -34,30 +35,45 @@ SECTION_BUDGETS = {
 }
 
 # Regex patterns untuk mendeteksi section headers
-# Mencocokkan: "1. Introduction", "## Introduction", "INTRODUCTION", "2 Methodology", dll
+# pymupdf4llm menghasilkan format seperti:
+#   ## **Abstract**
+#   ## **1 Introduction**
+#   ## I. INTRODUCTION
+#   ## **3 Model Architecture**
+#   ## **7 Conclusion**
+# Key: header dimulai dengan # dan mungkin dibungkus **bold**
 SECTION_PATTERNS = {
     "abstract": [
-        r"(?:^|\n)\s*(?:#+\s*)?(?:\d+[\.\)]\s*)?abstract\s*(?:\n|$)",
+        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*abstract\s*\*{0,2}\s*(?:\n|$)",
+        r"(?:^|\n)\s*\*{2}abstract\*{2}\s*(?:\n|$)",
+        r"(?:^|\n)\s*abstract\s*(?:\n|$)",
     ],
     "introduction": [
-        r"(?:^|\n)\s*(?:#+\s*)?(?:\d+[\.\)]\s*)?introduction\s*(?:\n|$)",
-        r"(?:^|\n)\s*(?:#+\s*)?(?:\d+[\.\)]\s*)?(?:i\.\s*)?pendahuluan\s*(?:\n|$)",
+        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.\)]\s*|[IV]+[\.\)]\s*)?introduction\s*\*{0,2}\s*(?:\n|$)",
+        r"(?:^|\n)\s*#{1,3}\s*(?:\d+[\.\)]\s*|[IV]+[\.\)]\s*)?introduction\s*(?:\n|$)",
+        r"(?:^|\n)\s*\*{0,2}\s*(?:\d+[\.\)]\s*)?pendahuluan\s*\*{0,2}\s*(?:\n|$)",
     ],
     "method": [
-        r"(?:^|\n)\s*(?:#+\s*)?(?:\d+[\.\)]\s*)?(?:method(?:ology|s)?|approach|proposed\s+(?:method|approach|system))\s*(?:\n|$)",
-        r"(?:^|\n)\s*(?:#+\s*)?(?:\d+[\.\)]\s*)?(?:metode|metodologi)\s*(?:\n|$)",
+        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.\)]\s*)?(?:model\s+architecture|method(?:ology|s)?|approach|proposed\s+(?:method|approach|system|framework))\s*\*{0,2}\s*(?:\n|$)",
+        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.\)]\s*)?(?:metode|metodologi)\s*\*{0,2}\s*(?:\n|$)",
     ],
     "results": [
-        r"(?:^|\n)\s*(?:#+\s*)?(?:\d+[\.\)]\s*)?(?:results?(?:\s+and\s+discussion)?|experiments?(?:\s+and\s+results?)?|evaluation)\s*(?:\n|$)",
-        r"(?:^|\n)\s*(?:#+\s*)?(?:\d+[\.\)]\s*)?(?:hasil(?:\s+dan\s+pembahasan)?)\s*(?:\n|$)",
+        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.\)]\s*)?(?:results?(?:\s+and\s+discussion)?|experiments?(?:\s+and\s+results?)?|evaluation)\s*\*{0,2}\s*(?:\n|$)",
+        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.\)]\s*)?(?:hasil(?:\s+dan\s+pembahasan)?)\s*\*{0,2}\s*(?:\n|$)",
     ],
     "conclusion": [
-        r"(?:^|\n)\s*(?:#+\s*)?(?:\d+[\.\)]\s*)?(?:conclusion(?:s)?(?:\s+and\s+future\s+work)?|summary|discussion)\s*(?:\n|$)",
-        r"(?:^|\n)\s*(?:#+\s*)?(?:\d+[\.\)]\s*)?(?:kesimpulan|simpulan)\s*(?:\n|$)",
+        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.\)]\s*)?(?:conclusion(?:s)?(?:\s+and\s+future\s+work)?|summary)\s*\*{0,2}\s*(?:\n|$)",
+        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.\)]\s*)?(?:kesimpulan|simpulan)\s*\*{0,2}\s*(?:\n|$)",
     ],
 }
 
-# ── HELPERS ──────────────────────────────────────────────────────────────────
+# Pattern untuk mendeteksi header apapun (batas section berikutnya)
+NEXT_SECTION_PATTERN = re.compile(
+    r"\n\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.\)]?\s*)?[A-Z]",
+    re.MULTILINE,
+)
+
+# -- HELPERS ------------------------------------------------------------------
 
 def _safe_log(analysis_id: str, step: str, status: str, message: str) -> None:
     """Logging ke Laravel secara best-effort."""
@@ -99,11 +115,8 @@ def _extract_section_content(text: str, section_name: str, max_chars: int) -> st
     start = pos[1]  # Mulai setelah header
     remaining = text[start:]
 
-    # Cari awal section berikutnya (header pattern umum)
-    next_section = re.search(
-        r"\n\s*(?:#+\s*)?(?:\d+[\.\)]\s*)?(?:[A-Z][a-z]+(?:\s+[A-Za-z]+)*)\s*\n",
-        remaining,
-    )
+    # Cari awal section berikutnya (any markdown header)
+    next_section = NEXT_SECTION_PATTERN.search(remaining)
 
     if next_section:
         content = remaining[:next_section.start()]
@@ -127,7 +140,7 @@ def _extract_section_content(text: str, section_name: str, max_chars: int) -> st
 def _extract_evidence_chunks(raw_markdown: str) -> list[dict]:
     """
     Extract evidence chunks dari raw_markdown berdasarkan section detection.
-    Return list of {"section": str, "content": str}.
+    Return list of {"section": str, "content": str, "chars": int}.
     """
     chunks = []
 
@@ -150,7 +163,6 @@ def _fallback_chunks(state: ReviewEngineState) -> list[dict]:
     """
     raw = state.get("raw_markdown") or ""
     if not raw:
-        # Fallback ke document_head/tail dari metadata_extract
         head = state.get("document_head") or ""
         tail = state.get("document_tail") or ""
         chunks = []
@@ -234,7 +246,7 @@ def _build_references_section(state: ReviewEngineState) -> str:
     return "\n".join(lines)
 
 
-# ── NODE UTAMA ───────────────────────────────────────────────────────────────
+# -- NODE UTAMA ---------------------------------------------------------------
 
 async def evidence_select_node(state: ReviewEngineState) -> dict:
     """
@@ -258,7 +270,7 @@ async def evidence_select_node(state: ReviewEngineState) -> dict:
     print(f"[evidence_select] raw_markdown: {len(raw_markdown)} chars")
     _safe_log(analysis_id, "evidence", "processing", "Menyiapkan evidence untuk review...")
 
-    # ─── Step 1: Extract evidence chunks ──────────────────────────────────
+    # --- Step 1: Extract evidence chunks ---
     chunks = _extract_evidence_chunks(raw_markdown) if raw_markdown else []
 
     # Fallback jika terlalu sedikit section terdeteksi
@@ -272,7 +284,7 @@ async def evidence_select_node(state: ReviewEngineState) -> dict:
         for c in chunks:
             print(f"  - {c['section']}: {c['chars']} chars")
 
-    # ─── Step 2: Rakit review_context ─────────────────────────────────────
+    # --- Step 2: Rakit review_context ---
     metadata_section = _build_metadata_section(state)
     references_section = _build_references_section(state)
 
@@ -291,7 +303,7 @@ async def evidence_select_node(state: ReviewEngineState) -> dict:
 
     review_context = "\n\n".join(sections)
 
-    # ─── Logging & summary ────────────────────────────────────────────────
+    # --- Logging ---
     context_len = len(review_context)
     chunks_count = len(chunks)
     refs_count = len(state.get("top_references") or [])
