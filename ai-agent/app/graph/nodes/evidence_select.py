@@ -49,21 +49,20 @@ SECTION_PATTERNS = {
         r"(?:^|\n)\s*abstract\s*(?:\n|$)",
     ],
     "introduction": [
-        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.\)]\s*|[IV]+[\.\)]\s*)?introduction\s*\*{0,2}\s*(?:\n|$)",
-        r"(?:^|\n)\s*#{1,3}\s*(?:\d+[\.\)]\s*|[IV]+[\.\)]\s*)?introduction\s*(?:\n|$)",
-        r"(?:^|\n)\s*\*{0,2}\s*(?:\d+[\.\)]\s*)?pendahuluan\s*\*{0,2}\s*(?:\n|$)",
+        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.)]?\s+|[IV]+[\.)\s]\s*)?introduction\s*\*{0,2}\s*(?:\n|$)",
+        r"(?:^|\n)\s*\*{0,2}\s*(?:\d+[\.)]?\s+)?pendahuluan\s*\*{0,2}\s*(?:\n|$)",
     ],
     "method": [
-        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.\)]\s*)?(?:model\s+architecture|method(?:ology|s)?|approach|proposed\s+(?:method|approach|system|framework))\s*\*{0,2}\s*(?:\n|$)",
-        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.\)]\s*)?(?:metode|metodologi)\s*\*{0,2}\s*(?:\n|$)",
+        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.)]?\s+)?(?:model\s+architecture|method(?:ology|s)?|approach|proposed\s+(?:method|approach|system|framework)|training)\s*\*{0,2}\s*(?:\n|$)",
+        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.)]?\s+)?(?:metode|metodologi)\s*\*{0,2}\s*(?:\n|$)",
     ],
     "results": [
-        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.\)]\s*)?(?:results?(?:\s+and\s+discussion)?|experiments?(?:\s+and\s+results?)?|evaluation)\s*\*{0,2}\s*(?:\n|$)",
-        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.\)]\s*)?(?:hasil(?:\s+dan\s+pembahasan)?)\s*\*{0,2}\s*(?:\n|$)",
+        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.)]?\s+)?(?:results?(?:\s+and\s+discussion)?|experiments?(?:\s+and\s+results?)?|evaluation)\s*\*{0,2}\s*(?:\n|$)",
+        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.)]?\s+)?(?:hasil(?:\s+dan\s+pembahasan)?)\s*\*{0,2}\s*(?:\n|$)",
     ],
     "conclusion": [
-        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.\)]\s*)?(?:conclusion(?:s)?(?:\s+and\s+future\s+work)?|summary)\s*\*{0,2}\s*(?:\n|$)",
-        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.\)]\s*)?(?:kesimpulan|simpulan)\s*\*{0,2}\s*(?:\n|$)",
+        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.)]?\s+)?(?:conclusion(?:s)?(?:\s+and\s+future\s+work)?|summary)\s*\*{0,2}\s*(?:\n|$)",
+        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.)]?\s+)?(?:kesimpulan|simpulan)\s*\*{0,2}\s*(?:\n|$)",
     ],
 }
 
