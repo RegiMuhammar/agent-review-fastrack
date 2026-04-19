@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim()
 
 function getErrorMessage(payload, fallbackMessage) {
   if (!payload) {
@@ -22,6 +22,10 @@ function getErrorMessage(payload, fallbackMessage) {
 
 async function request(path, options = {}) {
   const { method = 'GET', body, token, responseType = 'json' } = options
+
+  if (!API_BASE_URL) {
+    throw new Error('VITE_API_BASE_URL belum diset di frontend/.env')
+  }
 
   const headers = {
     Accept: 'application/json',
