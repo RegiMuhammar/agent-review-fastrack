@@ -38,7 +38,8 @@ Struktur JSON yang dibutuhkan:
   "title": "Judul lengkap dokumen (string)",
   "abstract": "Teks abstrak lengkap (string, kosongkan jika tidak ditemukan)",
   "authors": ["Nama Penulis 1", "Nama Penulis 2"],
-  "keywords": ["keyword1", "keyword2", "keyword3"]
+  "keywords": ["keyword1", "keyword2", "keyword3"],
+  "year": 2024
 }
 
 Aturan:
@@ -46,6 +47,7 @@ Aturan:
 - Untuk "abstract": ekstrak abstrak verbatim jika ada; string kosong jika tidak ada
 - Untuk "authors": daftarkan semua nama penulis yang ditemukan di area header; list kosong jika tidak jelas
 - Untuk "keywords": ekstrak keywords yang tercantum eksplisit ATAU simpulkan 3-5 topik kunci dari abstrak
+- Untuk "year": cari tahun publikasi dokumen (biasanya ada di header, footer, atau dekat publisher info); integer atau null jika tidak ada
 - Jangan mengarang informasi; jika field tidak ditemukan, gunakan string kosong atau list kosong
 """
 
@@ -146,6 +148,16 @@ async def metadata_extract_node(state: ReviewEngineState) -> dict:
         abstract = (data.get("abstract") or "").strip()
         authors = data.get("authors") or []
         keywords = data.get("keywords") or []
+        year = data.get("year")
+        
+        # Coerce year to int if string
+        try:
+            if year and not isinstance(year, int):
+                # Try to extract 4 digit year from string
+                match_year = re.search(r"\b(19|20)\d{2}\b", str(year))
+                year = int(match_year.group(0)) if match_year else None
+        except:
+            year = None
 
         # Gunakan title dari LLM jika lebih baik daripada regex
         # LLM title dianggap "lebih baik" jika tidak kosong dan bukan generic
@@ -155,10 +167,11 @@ async def metadata_extract_node(state: ReviewEngineState) -> dict:
         print(f"[metadata_extract] Abstract: {len(abstract)} chars")
         print(f"[metadata_extract] Authors: {authors}")
         print(f"[metadata_extract] Keywords: {keywords}")
+        print(f"[metadata_extract] Year: {year}")
 
         _safe_log(
             analysis_id, "metadata", "done",
-            f"Metadata diekstrak — Title: \"{final_title[:60]}\"",
+            f"Metadata diekstrak — Title: \"{final_title[:60]}\" ({year or 'N/A'})",
         )
 
         return {
@@ -166,6 +179,7 @@ async def metadata_extract_node(state: ReviewEngineState) -> dict:
             "abstract": abstract,
             "authors": authors,
             "keywords": keywords,
+            "year": year,
             "document_head": document_head,
             "document_tail": document_tail,
         }
@@ -183,6 +197,7 @@ async def metadata_extract_node(state: ReviewEngineState) -> dict:
             "abstract": "",
             "authors": [],
             "keywords": [],
+            "year": None,
             "document_head": document_head,
             "document_tail": document_tail,
         }
@@ -200,6 +215,7 @@ async def metadata_extract_node(state: ReviewEngineState) -> dict:
             "abstract": "",
             "authors": [],
             "keywords": [],
+            "year": None,
             "document_head": document_head,
             "document_tail": document_tail,
         }

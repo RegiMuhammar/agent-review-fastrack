@@ -25,10 +25,11 @@ logger = logging.getLogger(__name__)
 
 # -- CONSTANTS ----------------------------------------------------------------
 
-# Budget karakter per section (total target ~3500 chars untuk evidence)
+# Budget karakter per section (total target ~4000 chars untuk evidence)
 SECTION_BUDGETS = {
     "abstract":     500,
     "introduction": 800,
+    "prior_work":   600,
     "method":       800,
     "results":      600,
     "conclusion":   500,
@@ -51,6 +52,10 @@ SECTION_PATTERNS = {
     "introduction": [
         r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.)]?\s+|[IV]+[\.)\s]\s*)?introduction\s*\*{0,2}\s*(?:\n|$)",
         r"(?:^|\n)\s*\*{0,2}\s*(?:\d+[\.)]?\s+)?pendahuluan\s*\*{0,2}\s*(?:\n|$)",
+    ],
+    "prior_work": [
+        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.)]?\s+)?(?:background|related\s+work|prior\s+work|literature\s+review)\s*\*{0,2}\s*(?:\n|$)",
+        r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.)]?\s+)?(?:latar\s+belakang|tinjauan\s+pustaka)\s*\*{0,2}\s*(?:\n|$)",
     ],
     "method": [
         r"(?:^|\n)\s*#{1,3}\s*\*{0,2}\s*(?:\d+[\.)]?\s+)?(?:model\s+architecture|method(?:ology|s)?|approach|proposed\s+(?:method|approach|system|framework)|training)\s*\*{0,2}\s*(?:\n|$)",
@@ -210,8 +215,10 @@ def _build_metadata_section(state: ReviewEngineState) -> str:
     domain = state.get("domain") or ""
     sub_domain = state.get("sub_domain") or ""
     paper_type = state.get("paper_type") or ""
+    year = state.get("year") or "N/A"
 
     lines = ["PAPER METADATA", f"- Title: {title}"]
+    lines.append(f"- Publication Year: {year}")
 
     if authors:
         lines.append(f"- Authors: {', '.join(authors[:5])}")

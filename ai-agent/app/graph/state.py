@@ -20,6 +20,7 @@ class ReviewEngineState(TypedDict):
     abstract:       str
     authors:        list[str]
     keywords:       list[str]
+    year:           int | None   # Tahun publikasi dokumen
     document_head:  str          # ~3000-4000 karakter awal dokumen
     document_tail:  str          # ~1000-2000 karakter akhir dokumen
 

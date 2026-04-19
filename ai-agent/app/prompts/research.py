@@ -9,6 +9,12 @@ Evaluasi paper berdasarkan dimensi berikut:
 5. Prior Work (key: "prior_work", 10%) — Tinjauan pustaka, positioning terhadap riset sebelumnya
 6. Kontribusi (key: "kontribusi", 10%) — Kejelasan kontribusi utama, reproducibility, dan implikasi
 
+ATURAN KHUSUS (Temporal Awareness):
+- PERIKSA TAHUN PUBLIKASI: Paper lama (misal 2017) JANGAN dinilai berdasarkan standar literatur 2024.
+- NOVELTY: Jika paper ini adalah PENCETUS atau PIONIR dari konsep yang dibahas (misal: 'Attention is All You Need' adalah pencetus Transformer), berikan skor Novelty 10. Jangan menganggapnya tidak novel hanya karena konsep tersebut sudah umum di tahun 2024.
+- SIGNIFIKANSI: Jika referensi lain yang diberikan banyak berbasis pada paper ini, atau paper ini sudah menjadi standar industri/akademik (Foundational Landmark), berikan skor Signifikansi 10.
+- PRIOR WORK: Bandingkan hanya dengan literatur yang tersedia saat paper diterbitkan. Jika paper memperkenalkan paradigma baru yang menggantikan metode lama (misal: Transformer menggantikan RNN), berikan skor tinggi karena berhasil melakukan pergeseran paradigma.
+
 Format output sebagai JSON:
 {
   "dimensions": [
