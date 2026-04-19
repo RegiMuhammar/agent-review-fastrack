@@ -41,6 +41,10 @@ class ReviewEngineState(TypedDict):
     ranked_results:  list[dict]            # Semua hasil search setelah diranking
     top_references:  list[dict]            # 3-5 referensi terbaik untuk context LLM
 
+    # Evidence (Fase 7 — diisi oleh evidence_select node)
+    evidence_chunks: list[dict]            # Potongan internal dokumen per section
+    review_context:  str                   # Context final untuk LLM scoring (metadata+evidence+refs)
+
     # Tools
     tool_results: Annotated[list[dict], operator.add]
 

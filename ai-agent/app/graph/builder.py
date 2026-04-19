@@ -9,6 +9,7 @@ from app.graph.nodes.document_profile import document_profile_node
 from app.graph.nodes.retrieval_prep import retrieval_prep_node
 from app.graph.nodes.search_execute import search_execute_node
 from app.graph.nodes.search_rank import search_rank_node
+from app.graph.nodes.evidence_select import evidence_select_node
 from app.graph.nodes.research_agent import research_agent_node
 from app.graph.nodes.score import score_node
 from app.graph.nodes.generate import generate_node
@@ -51,6 +52,7 @@ def build_graph() -> StateGraph:
     graph.add_node("retrieval_prep", retrieval_prep_node)      # Fase 4
     graph.add_node("search_execute", search_execute_node)      # Fase 5
     graph.add_node("search_rank", search_rank_node)            # Fase 6
+    graph.add_node("evidence_select", evidence_select_node)    # Fase 7
     graph.add_node("research_agent", research_agent_node)      # Fase 2
     graph.add_node("score", score_node)
     graph.add_node("generate", generate_node)
@@ -78,11 +80,12 @@ def build_graph() -> StateGraph:
         }
     )
     
-    # 5. Jalur research: profile → queries → search → rank → agent
+    # 5. Jalur research: profile → queries → search → rank → evidence → agent
     graph.add_edge("document_profile", "retrieval_prep")   # Fase 4
     graph.add_edge("retrieval_prep", "search_execute")     # Fase 5
     graph.add_edge("search_execute", "search_rank")        # Fase 6
-    graph.add_edge("search_rank", "research_agent")        # Fase 6
+    graph.add_edge("search_rank", "evidence_select")       # Fase 7
+    graph.add_edge("evidence_select", "research_agent")    # Fase 7
     
     # 6. Semua jalur agent → score → generate
     graph.add_edge("essay_agent", "score")
