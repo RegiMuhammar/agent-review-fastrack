@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Throwable;
 
 class AnalysisController extends Controller
 {
@@ -90,7 +91,24 @@ class AnalysisController extends Controller
             'status' => 'pending',
         ]);
 
-        TriggerAiReviewJob::dispatch($analysis->id)->onQueue('ai-review');
+        try {
+            TriggerAiReviewJob::dispatch($analysis->id)->onQueue('ai-review');
+        } catch (Throwable $exception) {
+            $analysis->update([
+                'status' => 'failed',
+                'error_message' => 'Gagal memasukkan dokumen ke antrean AI. Pastikan Redis/Queue aktif.',
+                'completed_at' => now(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Dokumen tersimpan, tetapi gagal masuk antrean AI. Silakan coba lagi setelah service queue aktif.',
+                'data' => [
+                    'analysis' => $analysis,
+                    'file_path' => $analysis->file_path,
+                ],
+            ], 503);
+        }
 
         return response()->json([
             'success' => true,
