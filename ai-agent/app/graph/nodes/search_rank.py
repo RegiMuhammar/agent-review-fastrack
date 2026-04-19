@@ -157,7 +157,7 @@ async def _llm_rerank(candidates: list[dict], state: ReviewEngineState) -> list[
 
     try:
         llm = ChatGroq(
-            model="llama-3.1-8b-instant",
+            model="llama-3.3-70b-versatile",
             temperature=0,
             api_key=settings.GROQ_API_KEY,
         )

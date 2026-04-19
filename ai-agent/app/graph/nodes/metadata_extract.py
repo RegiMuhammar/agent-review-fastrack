@@ -127,7 +127,7 @@ async def metadata_extract_node(state: ReviewEngineState) -> dict:
 
     # ─── LLM call untuk ekstraksi metadata ───────────────────────────────
     llm = ChatGroq(
-        model="llama-3.1-8b-instant",
+        model="llama-3.3-70b-versatile",
         temperature=0,
         api_key=settings.GROQ_API_KEY,
     )

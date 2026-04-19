@@ -154,7 +154,7 @@ async def retrieval_prep_node(state: ReviewEngineState) -> dict:
 
     # ─── LLM call untuk generate queries ─────────────────────────────────
     llm = ChatGroq(
-        model="llama-3.1-8b-instant",
+        model="llama-3.3-70b-versatile",
         temperature=0.3,   # Sedikit kreativitas untuk variasi query
         api_key=settings.GROQ_API_KEY,
     )
