@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laporan Evaluasi AI — RAGAS</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --serif: 'DM Serif Display', serif;
+    --sans: 'DM Sans', sans-serif;
+    --bg: #fafaf8;
+    --surface: #f1efe8;
+    --card: #ffffff;
+    --border: rgba(0,0,0,0.12);
+    --border-soft: rgba(0,0,0,0.07);
+    --text-primary: #1a1a18;
+    --text-secondary: #5f5e5a;
+    --text-tertiary: #888780;
+    --blue: #3266AD;
+    --green: #639922;
+    --amber: #BA7517;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18;
+      --surface: #2c2c2a;
+      --card: #222220;
+      --border: rgba(255,255,255,0.15);
+      --border-soft: rgba(255,255,255,0.08);
+      --text-primary: #f1efe8;
+      --text-secondary: #b4b2a9;
+      --text-tertiary: #888780;
+    }
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    padding: 2rem 1rem 4rem;
+  }
+
+  .report {
+    max-width: 740px;
+    margin: 0 auto;
+  }
+
+  /* ── Header ── */
+  .header {
+    border-bottom: 1.5px solid var(--border);
+    padding-bottom: 1.5rem;
+    margin-bottom: 1.75rem;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 4px 11px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    margin-bottom: .85rem;
+  }
+
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    flex-shrink: 0;
+  }
+
+  .paper-title {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--text-primary);
+    margin-bottom: .45rem;
+  }
+
+  .meta {
+    font-size: 13px;
+    color: var(--text-tertiary);
+  }
+
+  /* ── Score hero ── */
+  .score-hero {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1.5rem;
+    align-items: center;
+    background: var(--surface);
+    border: 0.5px solid var(--border-soft);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .score-left { text-align: center; }
+
+  .score-big {
+    font-family: var(--serif);
+    font-size: 60px;
+    line-height: 1;
+    color: var(--text-primary);
+  }
+
+  .score-denom {
+    font-size: 18px;
+    color: var(--text-tertiary);
+    font-weight: 300;
+    vertical-align: super;
+  }
+
+  .score-label {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    margin-top: 6px;
+  }
+
+  .summary-text {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.75;
+  }
+
+  /* ── Section label ── */
+  .section-label {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--text-tertiary);
+    margin-bottom: .85rem;
+  }
+
+  /* ── Radar chart ── */
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 260px;
+    margin-bottom: 2rem;
+  }
+
+  /* ── Dimensions ── */
+  .dim-grid {
+    display: grid;
+    gap: .65rem;
+    margin-bottom: 2rem;
+  }
+
+  .dim-row {
+    background: var(--card);
+    border: 0.5px solid var(--border-soft);
+    border-radius: var(--radius-md);
+    padding: 1rem 1.1rem;
+  }
+
+  .dim-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: .55rem;
+  }
+
+  .dim-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .dim-score-num {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .dim-weight {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-left: 5px;
+  }
+
+  .bar-track {
+    height: 4px;
+    background: var(--surface);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: .6rem;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 2px;
+  }
+
+  .dim-feedback {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    line-height: 1.65;
+  }
+
+  /* ── Overall card ── */
+  .overall-card {
+    border: 0.5px solid var(--border-soft);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1.4rem;
+    margin-bottom: 2rem;
+    background: var(--card);
+  }
+
+  .overall-text {
+    font-size: 13.5px;
+    color: var(--text-secondary);
+    line-height: 1.75;
+  }
+
+  /* ── Divider ── */
+  hr {
+    border: none;
+    border-top: 0.5px solid var(--border-soft);
+    margin: 1.75rem 0;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-align: center;
+    margin-top: 2.5rem;
+    padding-top: 1.25rem;
+    border-top: 0.5px solid var(--border-soft);
+  }
+
+  @media (max-width: 500px) {
+    .score-hero { grid-template-columns: 1fr; text-align: center; }
+    .score-left { margin: 0 auto; }
+  }
+</style>
+</head>
+<body>
+<div class="report">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="badge">
+      <span class="dot"></span>
+      Laporan Evaluasi AI &nbsp;·&nbsp; Essay &nbsp;·&nbsp; 8 Halaman
+    </div>
+    <h1 class="paper-title">RAGAS: Automated Evaluation of Retrieval Augmented Generation</h1>
+    <p class="meta">ID Analisis: #1 &nbsp;·&nbsp; Dihasilkan secara otomatis</p>
+  </div>
+
+  <!-- Score Hero -->
+  <div class="score-hero">
+    <div class="score-left">
+      <div class="score-big">3.55<span class="score-denom">/10</span></div>
+      <div class="score-label">Skor Keseluruhan</div>
+    </div>
+    <p class="summary-text">
+      Paper ini memiliki kelemahan dalam pengembangan argumen, struktur, dan orisinalitas. Namun, bukti dan referensi yang digunakan sangat baik dan relevan dengan topik yang dibahas.
+    </p>
+  </div>
+
+  <!-- Radar Chart -->
+  <p class="section-label">Profil Dimensi</p>
+  <div class="chart-wrap">
+    <canvas id="radarChart" role="img"
+      aria-label="Radar chart 6 dimensi evaluasi: Tesis & Argumen 8.0, Struktur & Koherensi 7.5, Bukti & Referensi 8.5, Gaya Bahasa 8.0, Orisinalitas 7.0, Simpulan 8.5">
+      Radar chart dimensi evaluasi paper.
+    </canvas>
+  </div>
+
+  <hr>
+
+  <!-- Dimensions -->
+  <p class="section-label">Penilaian per Dimensi</p>
+  <div class="dim-grid" id="dimGrid"></div>
+
+  <!-- Overall Feedback -->
+  <p class="section-label">Catatan Keseluruhan</p>
+  <div class="overall-card">
+    <p class="overall-text">
+      Paper ini memiliki beberapa kelemahan dalam pengembangan argumen, struktur, dan orisinalitas. Namun, bukti dan referensi yang digunakan sangat baik dan relevan dengan topik yang dibahas. Simpulan paper ini sangat baik dan efektif dalam menggambarkan hasil penelitian dan implikasinya.
+    </p>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">Laporan ini dihasilkan secara otomatis oleh sistem evaluasi AI &nbsp;·&nbsp; Analysis ID #1</div>
+
+</div>
+
+<script>
+  const dims = [
+    { name: "Tesis & Argumen",    score: 8.0, weight: 0.25, color: "#3266AD",
+      feedback: "Tesis dan argumen yang digunakan dalam paper ini relatif jelas dan logis. Namun, ada beberapa kelemahan dalam pengembangan argumen, seperti kurangnya pengujian dan evaluasi yang komprehensif." },
+    { name: "Struktur & Koherensi", score: 7.5, weight: 0.20, color: "#3266AD",
+      feedback: "Struktur dan koherensi paper ini relatif baik, tetapi ada beberapa bagian yang terasa tidak terintegrasi dengan baik." },
+    { name: "Bukti & Referensi",  score: 8.5, weight: 0.20, color: "#639922",
+      feedback: "Bukti dan referensi yang digunakan dalam paper ini sangat baik dan relevan dengan topik yang dibahas." },
+    { name: "Gaya Bahasa",        score: 8.0, weight: 0.15, color: "#3266AD",
+      feedback: "Gaya bahasa yang digunakan dalam paper ini relatif baik dan mudah dipahami, tetapi ada beberapa bagian yang terasa kurang akurat." },
+    { name: "Orisinalitas",       score: 7.0, weight: 0.10, color: "#BA7517",
+      feedback: "Orisinalitas paper ini relatif baik, tetapi ada beberapa kelemahan dalam pengembangan ide dan konsep." },
+    { name: "Simpulan",           score: 8.5, weight: 0.10, color: "#639922",
+      feedback: "Simpulan paper ini sangat baik dan efektif dalam menggambarkan hasil penelitian dan implikasinya." }
+  ];
+
+  // Build dimension rows
+  const grid = document.getElementById('dimGrid');
+  dims.forEach(d => {
+    const pct = (d.score / 10 * 100).toFixed(1);
+    const row = document.createElement('div');
+    row.className = 'dim-row';
+    row.innerHTML = `
+      <div class="dim-top">
+        <span class="dim-name">${d.name}</span>
+        <span>
+          <span class="dim-score-num">${d.score.toFixed(1)} / 10</span>
+          <span class="dim-weight">bobot ${(d.weight * 100).toFixed(0)}%</span>
+        </span>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${pct}%; background:${d.color};"></div>
+      </div>
+      <p class="dim-feedback">${d.feedback}</p>`;
+    grid.appendChild(row);
+  });
+
+  // Radar Chart
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const gridColor  = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
+  const tickColor  = isDark ? '#888780' : '#888780';
+  const labelColor = isDark ? '#b4b2a9' : '#5f5e5a';
+  const fillColor  = isDark ? 'rgba(50,102,173,0.22)' : 'rgba(50,102,173,0.13)';
+
+  new Chart(document.getElementById('radarChart'), {
+    type: 'radar',
+    data: {
+      labels: dims.map(d => d.name),
+      datasets: [{
+        label: 'Skor',
+        data: dims.map(d => d.score),
+        backgroundColor: fillColor,
+        borderColor: '#3266AD',
+        borderWidth: 1.5,
+        pointBackgroundColor: '#3266AD',
+        pointRadius: 3,
+        pointHoverRadius: 5
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        r: {
+          min: 0, max: 10,
+          ticks: {
+            stepSize: 2,
+            backdropColor: 'transparent',
+            color: tickColor,
+            font: { size: 10, family: "'DM Sans', sans-serif" }
+          },
+          grid: { color: gridColor },
+          angleLines: { color: gridColor },
+          pointLabels: {
+            color: labelColor,
+            font: { size: 12, family: "'DM Sans', sans-serif" }
+          }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: ctx => ' ' + ctx.raw.toFixed(1) + ' / 10' }
+        }
+      }
+    }
+  });
+</script>
+</body>
+</html>

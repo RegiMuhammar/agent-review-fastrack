@@ -89,18 +89,18 @@ def _select_context(state: ReviewEngineState) -> tuple[str, str]:
     Pilih context terbaik yang tersedia.
     
     Prioritas:
-    1. review_context (Fase 7 — evidence-based, untuk research)
-    2. agent_context (fallback — dari essay_document_profile atau research_agent lama)
+    1. review_context (Fungsi akhir dari research_agent atau essay_agent)
+    2. agent_context (fallback default)
     
     Return: (context_text, source_label)
     """
     doc_type = state.get("doc_type", "essay")
 
-    # Research: prioritaskan review_context dari evidence_select
-    if doc_type == "research":
+    # Research & Essay: prioritaskan review_context jika tersedia
+    if doc_type in ["research", "essay"]:
         review_context = state.get("review_context") or ""
         if review_context:
-            return review_context, "review_context (evidence-based)"
+            return review_context, f"review_context ({doc_type}_agent)"
 
     # Essay/bizplan atau fallback: gunakan agent_context
     agent_context = state.get("agent_context") or ""

@@ -34,6 +34,7 @@ class ReviewEngineState(TypedDict):
     # Agent prep
     agent_context: str
     search_queries: dict[str, list[str]]   # {"semanticscholar": [...], "arxiv": [...], "tavily": [...]}
+    run_essay_web_search: bool             # Flag apakah essay lulus heuristik search
 
     # Search (Fase 5 — diisi oleh search_execute node)
     search_results: list[dict]             # Hasil search terdedup dari semua sumber

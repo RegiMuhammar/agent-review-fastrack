@@ -35,22 +35,22 @@ class TestRouteByDocType:
 
     def test_essay_goes_to_essay_agent(self):
         state: ReviewEngineState = {"doc_type": "essay"}  # type: ignore
-        assert route_by_doc_type(state) == "essay_agent"
+        assert route_by_doc_type(state) == "essay_document_profile"
 
     def test_research_goes_to_document_profile(self):
         """Research → document_profile (bukan essay_agent setelah Fase 3)."""
         state: ReviewEngineState = {"doc_type": "research"}  # type: ignore
-        assert route_by_doc_type(state) == "document_profile"
+        assert route_by_doc_type(state) == "research_document_profile"
 
     def test_bizplan_goes_to_essay_agent(self):
         """Bizplan fallback ke essay_agent (belum ada bizplan_agent)."""
         state: ReviewEngineState = {"doc_type": "bizplan"}  # type: ignore
-        assert route_by_doc_type(state) == "essay_agent"
+        assert route_by_doc_type(state) == "bizplan_document_profile"
 
     def test_unknown_goes_to_essay_agent(self):
-        """Doc type tidak dikenal → fallback ke essay_agent."""
+        """Doc type tidak dikenal → fallback ke essay_document_profile."""
         state: ReviewEngineState = {"doc_type": "unknown"}  # type: ignore
-        assert route_by_doc_type(state) == "essay_agent"
+        assert route_by_doc_type(state) == "essay_document_profile"
 
 
 # ── GRAPH STRUCTURE TESTS ────────────────────────────────────────────────────
@@ -63,13 +63,9 @@ class TestGraphStructure:
         assert review_pipeline is not None
 
     def test_node_count(self):
-        """Harus ada 12 nodes (+ __start__ dan __end__)."""
+        """Harus ada 15 nodes termasuk start dan end."""
         nodes = list(review_pipeline.get_graph().nodes.keys())
-        # __start__, extract, metadata_extract, essay_agent,
-        # document_profile, retrieval_prep, search_execute,
-        # search_rank, evidence_select, research_agent,
-        # score, generate, __end__
-        assert len(nodes) == 13
+        assert len(nodes) == 15
 
     def test_expected_nodes_present(self):
         """Semua node yang diharapkan harus terdaftar."""
@@ -77,10 +73,10 @@ class TestGraphStructure:
         expected = {
             "__start__", "__end__",
             "extract", "metadata_extract",
-            "essay_agent", "document_profile",
+            "essay_document_profile", "research_document_profile", "bizplan_document_profile",
             "retrieval_prep", "search_execute",
             "search_rank", "evidence_select",
-            "research_agent", "score", "generate",
+            "research_agent", "essay_agent", "score", "generate",
         }
         assert expected.issubset(nodes), f"Missing nodes: {expected - nodes}"
 
@@ -93,15 +89,14 @@ class TestGraphStructure:
         assert ("score", "generate") in edge_pairs
 
     def test_research_path_edges(self):
-        """Research path: profile → prep → search → rank → evidence → agent → score."""
+        """Research path: profile → prep → search → rank → evidence → conditional → research_agent → score."""
         edges = review_pipeline.get_graph().edges
         edge_pairs = {(e.source, e.target) for e in edges}
 
-        assert ("document_profile", "retrieval_prep") in edge_pairs
+        assert ("research_document_profile", "retrieval_prep") in edge_pairs
         assert ("retrieval_prep", "search_execute") in edge_pairs
         assert ("search_execute", "search_rank") in edge_pairs
         assert ("search_rank", "evidence_select") in edge_pairs
-        assert ("evidence_select", "research_agent") in edge_pairs
         assert ("research_agent", "score") in edge_pairs
 
 

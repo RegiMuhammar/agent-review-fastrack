@@ -133,12 +133,24 @@ async def retrieval_prep_node(state: ReviewEngineState) -> dict:
     print(f"\n[retrieval_prep] Memulai generasi search queries...")
     _safe_log(analysis_id, "query_gen", "processing", "Membuat search queries...")
 
+    doc_type = state.get("doc_type", "research")
+
     # ─── Guard: metadata terlalu minim → fallback ────────────────────────
     if not title and not abstract:
         print("[retrieval_prep] WARNING: title & abstract kosong, gunakan fallback queries")
         fallback = _build_fallback_queries(state)
         _safe_log(analysis_id, "query_gen", "done", "Queries: fallback (metadata kosong)")
         return {"search_queries": fallback}
+        
+    # ─── Guard: doc_type == essay ────────────────────────────────────────
+    if doc_type == "essay":
+        print("[retrieval_prep] doc_type=essay bypass LLM query gen, using profile queries if any")
+        existing_queries = state.get("search_queries", {})
+        if not existing_queries:
+            # Jika belum ada dari profil, panggil fallback sederhana
+            existing_queries = _build_fallback_queries(state)
+        _safe_log(analysis_id, "query_gen", "done", "Queries: generated from essay heuristic fallback")
+        return {"search_queries": existing_queries}
 
     # ─── LLM call untuk generate queries ─────────────────────────────────
     llm = ChatGroq(
