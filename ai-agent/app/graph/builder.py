@@ -3,29 +3,41 @@ from langgraph.graph import StateGraph, END
 
 from app.graph.state import ReviewEngineState
 from app.graph.nodes.extract import extract_node
-from app.graph.nodes.essay_agent import essay_agent_node
+from app.graph.nodes.metadata_extract import metadata_extract_node
+from app.graph.nodes.essay_document_profile import essay_document_profile_node
+from app.graph.nodes.research_document_profile import research_document_profile_node
+from app.graph.nodes.bizplan_document_profile import bizplan_document_profile_node
+from app.graph.nodes.retrieval_prep import retrieval_prep_node
+from app.graph.nodes.search_execute import search_execute_node
+from app.graph.nodes.search_rank import search_rank_node
+from app.graph.nodes.evidence_select import evidence_select_node
+from app.graph.nodes.research_agent import research_agent_node
 from app.graph.nodes.score import score_node
 from app.graph.nodes.generate import generate_node
 
-def route_by_doc_type(state: ReviewEngineState) -> Literal["essay_agent", "end_with_error"]:
+def route_after_extract(state: ReviewEngineState) -> Literal["metadata_extract", "end_with_error"]:
     """
-    Conditional edge: rute arah node berdasarkan 'doc_type'.
+    Conditional edge setelah extract:
+    - Jika valid → lanjut ke metadata_extract
+    - Jika gagal → langsung END
     """
-    # Jika gagal dari proses extract
     if not state.get("is_valid", False):
         return "end_with_error"
-    
-    # Check state doc_type, default = "essay"
+    return "metadata_extract"
+
+
+def route_by_doc_type(state: ReviewEngineState) -> Literal["essay_document_profile", "research_document_profile", "bizplan_document_profile"]:
+    """
+    Conditional edge setelah metadata_extract: rute berdasarkan 'doc_type'.
+    """
     doc_type = state.get("doc_type", "essay")
     
-    # Mapping untuk MVP, semuanya diarahkan ke 'essay_agent'
-    # Nanti di Fase 3 kita akan tambahkan research_agent & bizplan_agent
     route_map = {
-        "essay": "essay_agent",
-        "research": "essay_agent",    # fallback ke essay (Fase 2)
-        "bizplan": "essay_agent",     # fallback ke essay (Fase 2)
+        "essay": "essay_document_profile",
+        "research": "research_document_profile",
+        "bizplan": "bizplan_document_profile",
     }
-    return route_map.get(doc_type, "essay_agent")
+    return route_map.get(doc_type, "essay_document_profile")
 
 def build_graph() -> StateGraph:
     """Merakit dan meng-compile LangGraph Pipeline."""
@@ -33,9 +45,15 @@ def build_graph() -> StateGraph:
     
     # 1. Daftarkan Semua Node
     graph.add_node("extract", extract_node)
-    graph.add_node("essay_agent", essay_agent_node)
-    # graph.add_node("research_agent", research_agent_node)  # Nanti Fase 3
-    # graph.add_node("bizplan_agent", bizplan_agent_node)    # Nanti Fase 3
+    graph.add_node("metadata_extract", metadata_extract_node)  # Fase 1
+    graph.add_node("essay_document_profile", essay_document_profile_node)
+    graph.add_node("research_document_profile", research_document_profile_node)
+    graph.add_node("bizplan_document_profile", bizplan_document_profile_node)
+    graph.add_node("retrieval_prep", retrieval_prep_node)      # Fase 4
+    graph.add_node("search_execute", search_execute_node)      # Fase 5
+    graph.add_node("search_rank", search_rank_node)            # Fase 6
+    graph.add_node("evidence_select", evidence_select_node)    # Fase 7
+    graph.add_node("research_agent", research_agent_node)      # Fase 2
     graph.add_node("score", score_node)
     graph.add_node("generate", generate_node)
     
@@ -43,20 +61,37 @@ def build_graph() -> StateGraph:
     graph.set_entry_point("extract")
     
     # 3. Conditional Edge setelah extract
-    # Dari extract, akan menjalankan state mapping `route_by_doc_type`
     graph.add_conditional_edges(
         "extract",
-        route_by_doc_type,
+        route_after_extract,
         {
-            "essay_agent": "essay_agent",
-            # "research_agent": "research_agent", # Fase 3
-            # "bizplan_agent": "bizplan_agent", # Fase 3
-            "end_with_error": END, # Jika PDF rusak/is_valid False, langsung END graph
+            "metadata_extract": "metadata_extract",
+            "end_with_error": END,
         }
     )
     
-    # 4. Alur Lurus Agent -> Score -> Generate
-    graph.add_edge("essay_agent", "score")
+    # 4. Conditional Edge setelah metadata_extract → routing berdasarkan doc_type
+    graph.add_conditional_edges(
+        "metadata_extract",
+        route_by_doc_type,
+        {
+            "essay_document_profile": "essay_document_profile",
+            "research_document_profile": "research_document_profile",
+            "bizplan_document_profile": "bizplan_document_profile",
+        }
+    )
+    
+    # 5. Jalur research: profile → queries → search → rank → evidence → agent
+    graph.add_edge("research_document_profile", "retrieval_prep")   # Fase 4
+    graph.add_edge("retrieval_prep", "search_execute")     # Fase 5
+    graph.add_edge("search_execute", "search_rank")        # Fase 6
+    graph.add_edge("search_rank", "evidence_select")       # Fase 7
+    graph.add_edge("evidence_select", "research_agent")    # Fase 7
+    
+    # 6. Semua jalur agent → score → generate
+    graph.add_edge("essay_document_profile", "score")
+    graph.add_edge("bizplan_document_profile", "score")
+    graph.add_edge("research_agent", "score")
     graph.add_edge("score", "generate")
     graph.add_edge("generate", END)
     

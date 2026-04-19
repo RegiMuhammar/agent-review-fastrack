@@ -11,4 +11,5 @@ httpx
 pymupdf4llm
 langsmith
 langchain-groq
+arxiv
 pytest

@@ -17,7 +17,7 @@ async def log_step(analysis_id: str, step: str, status: str, message: str):
                 timeout=10.0,
             )
     except Exception as e:
-        print(f"⚠️ [Peringatan Laravel Client] Gagal mengirim log '{step}': {str(e)}")
+        print(f"[WARNING] [Laravel Client] Gagal mengirim log '{step}': {str(e)}")
 
 async def send_callback(analysis_id: str, status: str, result: dict | None = None, error: str | None = None):
     """Kirim final result ke Laravel."""
@@ -36,4 +36,4 @@ async def send_callback(analysis_id: str, status: str, result: dict | None = Non
                 timeout=30.0,
             )
     except Exception as e:
-        print(f"⚠️ [Peringatan Laravel Client] Gagal mengirim hasil callback akhir: {str(e)}")
+        print(f"[WARNING] [Laravel Client] Gagal mengirim callback akhir: {str(e)}")
