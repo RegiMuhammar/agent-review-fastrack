@@ -7,6 +7,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 
 from app.prompts.essay import ESSAY_SYSTEM_PROMPT
 from app.prompts.research import RESEARCH_SYSTEM_PROMPT
+from app.prompts.bizplan import BIZPLAN_SYSTEM_PROMPT
 from app.core.config import settings
 from app.graph.state import ReviewEngineState
 
@@ -25,9 +26,12 @@ DIMENSION_WEIGHTS = {
         "prior_work": 0.10, "kontribusi": 0.10,
     },
     "bizplan": {
-        "problem_solution": 0.25, "market_size": 0.20,
-        "business_model": 0.20, "competitive": 0.15,
-        "team": 0.10, "financial": 0.10,
+        "problem_solution": 0.25,
+        "market_size": 0.20,
+        "business_model": 0.20,
+        "competitive": 0.15,
+        "team": 0.10,
+        "financial": 0.10,
     },
 }
 
@@ -132,7 +136,7 @@ async def score_node(state: ReviewEngineState) -> dict:
     prompt_map = {
         "essay": ESSAY_SYSTEM_PROMPT,
         "research": RESEARCH_SYSTEM_PROMPT,
-        # "bizplan": BIZPLAN_SYSTEM_PROMPT,
+        "bizplan": BIZPLAN_SYSTEM_PROMPT,
     }
     
     system_prompt = prompt_map.get(doc_type, ESSAY_SYSTEM_PROMPT)

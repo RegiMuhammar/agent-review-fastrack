@@ -36,51 +36,54 @@ Evaluasi respons penulis terhadap pihak luar:
 
 ### ANALYTIC SCORING (6 Dimensi)
 
-Integrasikan hasil analisa Anda dari tiga framework di atas ke dalam narasi tanggapan (feedback) pada enam dimensi analitis ini:
+Integrasikan hasil analisa Anda dari tiga framework di atas ke dalam narasi tanggapan (feedback) pada enam dimensi analitis ini. 
 
-1. **Thesis Clarity** (key: `thesis_clarity`, 20%) — Ketajaman klaim utama (Toulmin Claim).
-2. **Argument Coherence** (key: `argument_coherence`, 25%) — Hubungan logis (Toulmin Warrant/Backing), ketiadaan kesalahan logika (Fallacy Scan).
-3. **Evidence Quality** (key: `evidence_quality`, 20%) — Kualitas dan relevansi data empiris atau konseptual pendukung awal.
-4. **Structure & Organization** (key: `structure_organization`, 15%) — Organisasi paragraf, alur naratif khas essay, pembuka-isi-penutup.
-5. **Writing Style & Clarity** (key: `writing_style_clarity`, 10%) — Gaya bahasa artikulatif, tanpa jargon rumit.
-6. **Citation & Academic Integrity** (key: `citation_integrity`, 10%) — Penggunaan sumber eksternal untuk memperkuat poin, membedakan kutipan ('They Say') dengan opini ('I Say').
+PENTING: 
+- Feedback WAJIB spesifik. JANGAN memberikan pujian atau saran umum. 
+- RUJUK bagian tertentu dalam teks (misal: "Pada paragraf pendahuluan...", "Argumen tentang X di halaman 2...").
+- Setiap dimensi WAJIB menyertakan SATU poin konkret yang bisa diperbaiki oleh penulis untuk menaikkan skornya, meskipun skor saat ini sudah tinggi.
 
-### FORMAT OUTPUT & BAHASA (BILINGUAL)
+1. **Thesis Clarity** (key: `thesis_clarity`, 20%) — Ketajaman klaim utama (Toulmin Claim). Evaluasi apakah tesis mudah ditemukan dan cukup sempit/spesifik.
+2. **Argument Coherence** (key: `argument_coherence`, 25%) — Hubungan logis (Toulmin Warrant/Backing), ketiadaan kesalahan logika (Fallacy Scan). Periksa apakah alur berpikir logis atau ada lonjakan kesimpulan.
+3. **Evidence Quality** (key: `evidence_quality`, 20%) — Kualitas dan relevansi data empiris atau konseptual pendukung. Apakah bukti yang digunakan kredibel dan dianalisis secara mendalam?
+4. **Structure & Organization** (key: `structure_organization`, 15%) — Organisasi paragraf, alur naratif khas essay, pembuka-isi-penutup. Apakah transisi antar paragraf halus?
+5. **Writing Style & Clarity** (key: `writing_style_clarity`, 10%) — Gaya bahasa artikulatif, pilihan kata yang tepat, dan kejelasan kalimat.
+6. **Citation & Academic Integrity** (key: `citation_integrity`, 10%) — Penggunaan sumber eksternal untuk memperkuat poin, membedakan kutipan ('They Say') dengan opini ('I Say'). Apakah sitasi sudah benar dan memperkuat argumen?
+
+### FORMAT OUTPUT & BAHASA
 Output HARUS JSON murni, TANPA markdown text.
-Gunakan label dua bahasa pada atribut nama dan deskripsi, contoh bahasa standar:
-"Nama Atribut (English Name)" atau "Penjelasan [ID]. Explanation [EN]."
-Gabungkan umpan balik dalam format bilingual (indonesia, lalu dipisah paragraf/titik untuk english).
+Gunakan bahasa Indonesia secara penuh dan profesional. Fokus pada kualitas masukan yang tajam dan konstruktif.
 
 Contoh Format JSON Valid:
 {
   "dimensions": [
     {
       "key": "thesis_clarity",
-      "name": "Kejelasan Tesis / Thesis Clarity",
+      "name": "Kejelasan Tesis",
       "weight": 0.2,
       "score": 8.0,
-      "feedback": "Tesis dinyatakan dengan cukup baik. ... [EN] The thesis is stated fairly well. ..."
+      "feedback": "Tesis dinyatakan dengan sangat jelas dan fokus pada isu utama..."
     },
     {
       "key": "argument_coherence",
-      "name": "Koherensi Argumen / Argument Coherence",
+      "name": "Koherensi Argumen",
       "weight": 0.25,
       "score": 7.5,
-      "feedback": "Bebas dari fallacy, warrant logis. [EN] Free of fallacies, logical warrant."
+      "feedback": "Argumen mengalir secara logis tanpa adanya fallacy yang terdeteksi..."
     },
     ... (lengkapi 6 dimensi dengan key yang tepat sesuai di atas) ...
   ],
-  "overall_feedback": "Tinjauan Keseluruhan... [EN] Overall review...",
-  "summary": "Ringkasan Eksekutif... [EN] Executive summary...",
+  "overall_feedback": "Secara keseluruhan, esai ini menunjukkan pemahaman mendalam tentang...",
+  "summary": "Analisis ini menyimpulkan bahwa penulis memiliki argumen yang kuat namun perlu memperdalam...",
   "strengths": [
-    "Kekuatan 1 [ID] / Strength 1 [EN]",
-    "Kekuatan 2 [ID] / Strength 2 [EN]",
-    "Kekuatan 3 [ID] / Strength 3 [EN]"
+    "Klaim utama yang tajam",
+    "Struktur paragraf yang rapi",
+    "Analisis kritis terhadap pandangan luar"
   ],
   "improvements": [
-    "Saran 1 [ID] / Advice 1 [EN] — Prioritas tinggi",
-    "Saran 2 [ID] / Advice 2 [EN]",
-    "Saran 3 [ID] / Advice 3 [EN]"
+    "Perdalam bagian warrant untuk menghubungkan evidence dengan claim",
+    "Tambahkan lebih banyak referensi pendukung",
+    "Sederhanakan kalimat yang terlalu kompleks"
   ]
 }
 """

@@ -48,10 +48,10 @@ def _extract_strengths_improvements(dimensions: list[dict]) -> tuple[list[str], 
         feedback = dim.get("feedback", "")
         label = dim.get("label", key.replace("_", " ").title())
 
-        if score >= 7.0 and feedback:
-            strengths.append(f"{label}: {feedback[:150]}")
-        elif score < 6.0 and feedback:
-            improvements.append(f"{label}: {feedback[:150]}")
+        if score >= 9.0 and feedback:
+            strengths.append(f"{label}: {feedback[:300]}")
+        elif score < 9.0 and feedback:
+            improvements.append(f"{label}: {feedback[:300]}")
 
     return strengths, improvements
 
@@ -113,21 +113,20 @@ async def generate_node(state: ReviewEngineState) -> dict:
         "abstract": (state.get("abstract") or "")[:500],
     }
 
-    # ─── Research specific enrichment (Profile & References) ──────────────
+    # ─── References (Now enabled for all doc_types!) ──────────────────────
+    top_refs = state.get("top_references") or []
+    final_result["references"] = _build_references_output(top_refs)
+
+    # ─── Research specific enrichment (Profile) ───────────────────────────
     if doc_type == "research":
-        # Profile
         final_result["profile"] = {
             "domain": state.get("domain"),
             "sub_domain": state.get("sub_domain"),
             "paper_type": state.get("paper_type"),
             "retrieval_focus": state.get("retrieval_focus", []),
         }
-
-        # References dari search pipeline
-        top_refs = state.get("top_references") or []
-        final_result["references"] = _build_references_output(top_refs)
-
-        # Stats pipeline (untuk debugging/monitoring)
+        
+        # Stats pipeline
         search_results_count = len(state.get("search_results") or [])
         evidence_chunks_count = len(state.get("evidence_chunks") or [])
         final_result["pipeline_stats"] = {
@@ -135,14 +134,8 @@ async def generate_node(state: ReviewEngineState) -> dict:
             "references_selected": len(top_refs),
             "evidence_chunks": evidence_chunks_count,
         }
-
-        print(f"[generate_node] Research enrichment: "
-              f"{len(top_refs)} refs, "
-              f"{evidence_chunks_count} evidence chunks, "
-              f"domain={state.get('domain', '?')}")
     else:
-        # Essay/bizplan: references kosong tapi field tetap ada
-        final_result["references"] = []
+        # Essay/bizplan basic profile
         final_result["profile"] = {
             "domain": state.get("domain"),
             "sub_domain": state.get("sub_domain"),
