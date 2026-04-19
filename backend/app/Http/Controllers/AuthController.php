@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 class AuthController extends Controller
 {
@@ -41,7 +42,18 @@ class AuthController extends Controller
 
         $user = User::where('email', $validated['email'])->first();
 
-        if (! $user || ! Hash::check($validated['password'], $user->password)) {
+        $isPasswordValid = false;
+
+        if ($user) {
+            try {
+                $isPasswordValid = Hash::check($validated['password'], $user->password);
+            } catch (RuntimeException) {
+                // Legacy/plaintext or incompatible hashes should not cause 500.
+                $isPasswordValid = false;
+            }
+        }
+
+        if (! $user || ! $isPasswordValid) {
             throw ValidationException::withMessages([
                 'email' => ['Email atau password tidak valid.'],
             ]);
