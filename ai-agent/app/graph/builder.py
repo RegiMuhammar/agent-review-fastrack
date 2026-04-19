@@ -4,8 +4,9 @@ from langgraph.graph import StateGraph, END
 from app.graph.state import ReviewEngineState
 from app.graph.nodes.extract import extract_node
 from app.graph.nodes.metadata_extract import metadata_extract_node
-from app.graph.nodes.essay_agent import essay_agent_node
-from app.graph.nodes.document_profile import document_profile_node
+from app.graph.nodes.essay_document_profile import essay_document_profile_node
+from app.graph.nodes.research_document_profile import research_document_profile_node
+from app.graph.nodes.bizplan_document_profile import bizplan_document_profile_node
 from app.graph.nodes.retrieval_prep import retrieval_prep_node
 from app.graph.nodes.search_execute import search_execute_node
 from app.graph.nodes.search_rank import search_rank_node
@@ -25,20 +26,18 @@ def route_after_extract(state: ReviewEngineState) -> Literal["metadata_extract",
     return "metadata_extract"
 
 
-def route_by_doc_type(state: ReviewEngineState) -> Literal["essay_agent", "document_profile"]:
+def route_by_doc_type(state: ReviewEngineState) -> Literal["essay_document_profile", "research_document_profile", "bizplan_document_profile"]:
     """
     Conditional edge setelah metadata_extract: rute berdasarkan 'doc_type'.
-    - essay/bizplan → langsung ke essay_agent
-    - research → document_profile → research_agent (Fase 3)
     """
     doc_type = state.get("doc_type", "essay")
     
     route_map = {
-        "essay": "essay_agent",
-        "research": "document_profile",  # Fase 3: profiling dulu sebelum research_agent
-        "bizplan": "essay_agent",        # fallback ke essay (belum ada bizplan_agent)
+        "essay": "essay_document_profile",
+        "research": "research_document_profile",
+        "bizplan": "bizplan_document_profile",
     }
-    return route_map.get(doc_type, "essay_agent")
+    return route_map.get(doc_type, "essay_document_profile")
 
 def build_graph() -> StateGraph:
     """Merakit dan meng-compile LangGraph Pipeline."""
@@ -47,8 +46,9 @@ def build_graph() -> StateGraph:
     # 1. Daftarkan Semua Node
     graph.add_node("extract", extract_node)
     graph.add_node("metadata_extract", metadata_extract_node)  # Fase 1
-    graph.add_node("essay_agent", essay_agent_node)
-    graph.add_node("document_profile", document_profile_node)  # Fase 3
+    graph.add_node("essay_document_profile", essay_document_profile_node)
+    graph.add_node("research_document_profile", research_document_profile_node)
+    graph.add_node("bizplan_document_profile", bizplan_document_profile_node)
     graph.add_node("retrieval_prep", retrieval_prep_node)      # Fase 4
     graph.add_node("search_execute", search_execute_node)      # Fase 5
     graph.add_node("search_rank", search_rank_node)            # Fase 6
@@ -75,20 +75,22 @@ def build_graph() -> StateGraph:
         "metadata_extract",
         route_by_doc_type,
         {
-            "essay_agent": "essay_agent",
-            "document_profile": "document_profile",
+            "essay_document_profile": "essay_document_profile",
+            "research_document_profile": "research_document_profile",
+            "bizplan_document_profile": "bizplan_document_profile",
         }
     )
     
     # 5. Jalur research: profile → queries → search → rank → evidence → agent
-    graph.add_edge("document_profile", "retrieval_prep")   # Fase 4
+    graph.add_edge("research_document_profile", "retrieval_prep")   # Fase 4
     graph.add_edge("retrieval_prep", "search_execute")     # Fase 5
     graph.add_edge("search_execute", "search_rank")        # Fase 6
     graph.add_edge("search_rank", "evidence_select")       # Fase 7
     graph.add_edge("evidence_select", "research_agent")    # Fase 7
     
     # 6. Semua jalur agent → score → generate
-    graph.add_edge("essay_agent", "score")
+    graph.add_edge("essay_document_profile", "score")
+    graph.add_edge("bizplan_document_profile", "score")
     graph.add_edge("research_agent", "score")
     graph.add_edge("score", "generate")
     graph.add_edge("generate", END)

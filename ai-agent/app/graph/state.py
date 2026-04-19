@@ -24,7 +24,7 @@ class ReviewEngineState(TypedDict):
     document_head:  str          # ~3000-4000 karakter awal dokumen
     document_tail:  str          # ~1000-2000 karakter akhir dokumen
 
-    # Document Profile (Fase 3 — diisi oleh document_profile node)
+    # Document Profile (Fase 3 — diisi oleh research_document_profile node)
     domain:           str | None           # e.g. "computer_science", "medicine"
     sub_domain:       str | None           # e.g. "natural_language_processing"
     paper_type:       str | None           # e.g. "empirical", "survey", "method"

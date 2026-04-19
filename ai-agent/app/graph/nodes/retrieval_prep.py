@@ -14,7 +14,7 @@ Output: search_queries = {"semanticscholar": [...], "arxiv": [...], "tavily": [.
 
 Search belum dijalankan di fase ini — hanya pembentukan query.
 
-Flow: ... → document_profile → retrieval_prep → research_agent → ...
+Flow: ... → research_document_profile → retrieval_prep → research_agent → ...
 """
 
 import json
@@ -115,7 +115,7 @@ async def retrieval_prep_node(state: ReviewEngineState) -> dict:
 
     Input dari state:
         - title, abstract, keywords (dari metadata_extract)
-        - domain, sub_domain, paper_type, retrieval_focus (dari document_profile)
+        - domain, sub_domain, paper_type, retrieval_focus (dari research_document_profile)
         - analysis_id (untuk logging)
 
     Output (di-merge ke state):

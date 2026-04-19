@@ -90,7 +90,7 @@ def _select_context(state: ReviewEngineState) -> tuple[str, str]:
     
     Prioritas:
     1. review_context (Fase 7 — evidence-based, untuk research)
-    2. agent_context (fallback — dari essay_agent atau research_agent lama)
+    2. agent_context (fallback — dari essay_document_profile atau research_agent lama)
     
     Return: (context_text, source_label)
     """

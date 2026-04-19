@@ -11,7 +11,7 @@ Perbedaan utama dengan essay_agent:
 - search_queries disiapkan sebagai placeholder untuk Fase 4.
 - Output state siap digunakan oleh node search & retrieval di fase berikutnya.
 
-Flow: extract → metadata_extract → document_profile → research_agent → score → generate
+Flow: extract → metadata_extract → research_document_profile → research_agent → score → generate
 """
 
 from app.graph.state import ReviewEngineState

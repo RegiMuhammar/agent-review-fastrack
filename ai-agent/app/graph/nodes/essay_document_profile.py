@@ -1,6 +1,6 @@
 from app.services.laravel_client import log_step
 
-async def essay_agent_node(state: dict) -> dict:
+async def essay_document_profile_node(state: dict) -> dict:
     """Prepare context dan search queries untuk essay preview."""
     await log_step(state["analysis_id"], "preparing", "processing", "Menyiapkan analisis essay...")
 

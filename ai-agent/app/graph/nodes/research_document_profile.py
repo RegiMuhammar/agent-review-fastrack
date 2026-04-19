@@ -1,5 +1,5 @@
 """
-document_profile.py — Document Profile Node (Fase 3)
+research_document_profile.py — Document Profile Node (Fase 3)
 =====================================================
 Node profiling khusus jalur research, berjalan setelah routing dan sebelum
 research_agent. Mengklasifikasikan domain, subdomain, paper type, dan
@@ -15,7 +15,7 @@ Desain defensif:
 - Fallback aman ke 'general' jika LLM gagal.
 - Node ini tidak mengubah field state manapun selain profiling fields.
 
-Flow: ... → metadata_extract → route("research") → document_profile → research_agent → ...
+Flow: ... → metadata_extract → route("research") → research_document_profile → research_agent → ...
 """
 
 import json
@@ -104,7 +104,7 @@ def _safe_log(analysis_id: str, step: str, status: str, message: str) -> None:
         except RuntimeError:
             asyncio.run(log_step(analysis_id, step, status, message))
     except Exception as exc:
-        print(f"[document_profile][log_step] log gagal (diabaikan): {exc}")
+        print(f"[research_document_profile][log_step] log gagal (diabaikan): {exc}")
 
 
 def _clean_llm_json(raw: str) -> str:
@@ -127,7 +127,7 @@ def _default_profile() -> dict:
 
 # ── NODE UTAMA ───────────────────────────────────────────────────────────────
 
-async def document_profile_node(state: ReviewEngineState) -> dict:
+async def research_document_profile_node(state: ReviewEngineState) -> dict:
     """
     LangGraph node: Klasifikasi profil dokumen research.
 
@@ -146,12 +146,12 @@ async def document_profile_node(state: ReviewEngineState) -> dict:
     abstract = state.get("abstract") or ""
     keywords = state.get("keywords") or []
 
-    print(f"\n[document_profile] Memulai profiling dokumen...")
+    print(f"\n[research_document_profile] Memulai profiling dokumen...")
     _safe_log(analysis_id, "profiling", "processing", "Menganalisis profil dokumen...")
 
     # ─── Guard: jika metadata terlalu minim, langsung fallback ───────────
     if not title and not abstract:
-        print("[document_profile] WARNING: title & abstract kosong, skip profiling")
+        print("[research_document_profile] WARNING: title & abstract kosong, skip profiling")
         _safe_log(analysis_id, "profiling", "done", "Profiling: skip (metadata kosong)")
         return _default_profile()
 
@@ -197,11 +197,11 @@ async def document_profile_node(state: ReviewEngineState) -> dict:
 
         reasoning = data.get("reasoning", "")
 
-        print(f"[document_profile] Domain: {domain}/{sub_domain}")
-        print(f"[document_profile] Paper type: {paper_type}")
-        print(f"[document_profile] Retrieval focus: {retrieval_focus}")
+        print(f"[research_document_profile] Domain: {domain}/{sub_domain}")
+        print(f"[research_document_profile] Paper type: {paper_type}")
+        print(f"[research_document_profile] Retrieval focus: {retrieval_focus}")
         if reasoning:
-            print(f"[document_profile] Reasoning: {reasoning}")
+            print(f"[research_document_profile] Reasoning: {reasoning}")
 
         _safe_log(
             analysis_id, "profiling", "done",
@@ -216,11 +216,11 @@ async def document_profile_node(state: ReviewEngineState) -> dict:
         }
 
     except json.JSONDecodeError as exc:
-        print(f"[document_profile] WARNING: JSON parse gagal: {exc}")
+        print(f"[research_document_profile] WARNING: JSON parse gagal: {exc}")
         _safe_log(analysis_id, "profiling", "done", "Profiling: fallback (JSON error)")
         return _default_profile()
 
     except Exception as exc:
-        print(f"[document_profile] WARNING: LLM call gagal: {exc}")
+        print(f"[research_document_profile] WARNING: LLM call gagal: {exc}")
         _safe_log(analysis_id, "profiling", "done", "Profiling: fallback (error)")
         return _default_profile()
