@@ -36,6 +36,12 @@ def route_after_essay_profile(state: ReviewEngineState) -> Literal["retrieval_pr
         return "retrieval_prep"
     return "essay_agent"
 
+def route_after_search_rank(state: ReviewEngineState) -> Literal["evidence_select", "essay_agent"]:
+    doc_type = state.get("doc_type", "research")
+    if doc_type == "essay":
+        return "essay_agent"
+    return "evidence_select"
+
 def route_after_evidence(state: ReviewEngineState) -> Literal["research_agent", "essay_agent"]:
     doc_type = state.get("doc_type", "research")
     if doc_type == "essay":
@@ -100,7 +106,14 @@ def build_graph() -> StateGraph:
     # 7. Subgraph Retrieval (Bisa dipanggil oleh research atau essay)
     graph.add_edge("retrieval_prep", "search_execute")
     graph.add_edge("search_execute", "search_rank")
-    graph.add_edge("search_rank", "evidence_select")
+    graph.add_conditional_edges(
+        "search_rank",
+        route_after_search_rank,
+        {
+            "evidence_select": "evidence_select",
+            "essay_agent": "essay_agent",
+        }
+    )
     
     # 8. Keluar dari Retrieval Subgraph
     graph.add_conditional_edges(

@@ -36,8 +36,8 @@ def _extract_strengths_improvements(dimensions: list[dict]) -> tuple[list[str], 
     Extract strengths dan improvements dari dimensi feedback.
     
     Strategi sederhana:
-    - Dimensi dengan skor >= 7.0 → strength
-    - Dimensi dengan skor < 6.0 → improvement
+    - Dimensi dengan skor >= 8.0 → strength
+    - Dimensi dengan skor < 6.5 → improvement
     """
     strengths = []
     improvements = []
@@ -48,9 +48,9 @@ def _extract_strengths_improvements(dimensions: list[dict]) -> tuple[list[str], 
         feedback = dim.get("feedback", "")
         label = dim.get("label", key.replace("_", " ").title())
 
-        if score >= 9.0 and feedback:
+        if score >= 8.0 and feedback:
             strengths.append(f"{label}: {feedback[:300]}")
-        elif score < 9.0 and feedback:
+        elif score < 6.5 and feedback:
             improvements.append(f"{label}: {feedback[:300]}")
 
     return strengths, improvements

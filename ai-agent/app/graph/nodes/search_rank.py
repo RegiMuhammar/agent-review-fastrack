@@ -47,7 +47,49 @@ def _normalize(text: str) -> set[str]:
     return set(re.sub(r"[^\w\s]", "", text.lower()).split())
 
 
-def _heuristic_score(result: dict, paper_words: set[str], paper_keywords: list[str]) -> float:
+def _temporal_alignment_score(result_year: int | None, target_year: int | None) -> float:
+    """
+    Skor kesesuaian temporal relatif terhadap tahun paper target.
+
+    Jika target_year tersedia, paper yang terbit di sekitar atau sebelum tahun target
+    diprioritaskan dibanding paper yang jauh lebih baru.
+    """
+    if not result_year or not isinstance(result_year, int):
+        return 0.5
+
+    if not target_year or not isinstance(target_year, int):
+        if result_year >= 2023:
+            return 1.0
+        if result_year >= 2020:
+            return 0.7
+        if result_year >= 2015:
+            return 0.4
+        return 0.2
+
+    if result_year <= target_year:
+        gap = target_year - result_year
+        if gap <= 2:
+            return 1.0
+        if gap <= 5:
+            return 0.8
+        if gap <= 10:
+            return 0.6
+        return 0.4
+
+    future_gap = result_year - target_year
+    if future_gap <= 2:
+        return 0.75
+    if future_gap <= 5:
+        return 0.55
+    return 0.35
+
+
+def _heuristic_score(
+    result: dict,
+    paper_words: set[str],
+    paper_keywords: list[str],
+    target_year: int | None,
+) -> float:
     """
     Heuristic relevance score (0.0 - 1.0).
 
@@ -80,19 +122,8 @@ def _heuristic_score(result: dict, paper_words: set[str], paper_keywords: list[s
     }
     source_score = source_weights.get(result.get("source", ""), 0.5)
 
-    # 3. Recency
-    year = result.get("year")
-    if year and isinstance(year, int):
-        if year >= 2023:
-            recency = 1.0
-        elif year >= 2020:
-            recency = 0.7
-        elif year >= 2015:
-            recency = 0.4
-        else:
-            recency = 0.2
-    else:
-        recency = 0.5  # unknown year → neutral
+    # 3. Temporal alignment
+    recency = _temporal_alignment_score(result.get("year"), target_year)
 
     # 4. Snippet quality
     snippet_len = len(result.get("snippet", ""))
@@ -237,11 +268,12 @@ async def search_rank_node(state: ReviewEngineState) -> dict:
     # ─── Step 1: Heuristic scoring ────────────────────────────────────────
     paper_title = state.get("title") or ""
     paper_keywords = state.get("keywords") or []
+    target_year = state.get("year")
     paper_words = _normalize(paper_title + " " + " ".join(paper_keywords))
 
     scored = []
     for r in search_results:
-        h_score = _heuristic_score(r, paper_words, paper_keywords)
+        h_score = _heuristic_score(r, paper_words, paper_keywords, target_year)
         scored.append({**r, "relevance_score": h_score})
 
     # Sort descending

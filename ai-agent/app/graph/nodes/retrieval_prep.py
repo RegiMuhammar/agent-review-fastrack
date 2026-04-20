@@ -107,6 +107,30 @@ def _build_fallback_queries(state: ReviewEngineState) -> dict[str, list[str]]:
     }
 
 
+def _build_essay_fallback_queries(state: ReviewEngineState) -> dict[str, list[str]]:
+    """Fallback query yang lebih cocok untuk essay berbasis verifikasi fakta."""
+    title = (state.get("title") or "").strip()
+    keywords = [kw.strip() for kw in (state.get("keywords") or []) if kw.strip()]
+    abstract = (state.get("abstract") or "").strip()
+
+    topic = title or " ".join(keywords[:4]) or "essay topic"
+    if not topic and abstract:
+        topic = " ".join(re.findall(r"[A-Za-z][A-Za-z\-]{3,}", abstract)[:8]) or "essay topic"
+
+    scoped_topic = f"{topic} {' '.join(keywords[:2])}".strip()
+    return {
+        "tavily": [
+            f"{scoped_topic} fact check".strip(),
+            f"{scoped_topic} statistics report".strip(),
+            f"{scoped_topic} background analysis".strip(),
+        ],
+        "semanticscholar": [
+            topic[:120],
+            f"{topic[:80]} literature review".strip(),
+        ] if keywords else [],
+    }
+
+
 # ── NODE UTAMA ───────────────────────────────────────────────────────────────
 
 async def retrieval_prep_node(state: ReviewEngineState) -> dict:
@@ -136,6 +160,14 @@ async def retrieval_prep_node(state: ReviewEngineState) -> dict:
     doc_type = state.get("doc_type", "research")
 
     # ─── Guard: metadata terlalu minim → fallback ────────────────────────
+    if doc_type == "essay":
+        print("[retrieval_prep] doc_type=essay bypass LLM query gen, using profile queries if any")
+        existing_queries = state.get("search_queries", {})
+        if not existing_queries:
+            existing_queries = _build_essay_fallback_queries(state)
+        _safe_log(analysis_id, "query_gen", "done", "Queries: generated from essay heuristic fallback")
+        return {"search_queries": existing_queries}
+
     if not title and not abstract:
         print("[retrieval_prep] WARNING: title & abstract kosong, gunakan fallback queries")
         fallback = _build_fallback_queries(state)
@@ -143,12 +175,12 @@ async def retrieval_prep_node(state: ReviewEngineState) -> dict:
         return {"search_queries": fallback}
         
     # ─── Guard: doc_type == essay ────────────────────────────────────────
-    if doc_type == "essay":
+    if False and doc_type == "essay":
         print("[retrieval_prep] doc_type=essay bypass LLM query gen, using profile queries if any")
         existing_queries = state.get("search_queries", {})
         if not existing_queries:
             # Jika belum ada dari profil, panggil fallback sederhana
-            existing_queries = _build_fallback_queries(state)
+            existing_queries = _build_essay_fallback_queries(state)
         _safe_log(analysis_id, "query_gen", "done", "Queries: generated from essay heuristic fallback")
         return {"search_queries": existing_queries}
 

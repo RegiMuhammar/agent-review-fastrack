@@ -8,6 +8,24 @@ Tugas utamanya adalah merakit `review_context` yang kaya bagi prompt skor.
 from app.graph.state import ReviewEngineState
 from app.services.laravel_client import log_step
 
+
+def _build_external_reference_block(top_references: list[dict]) -> str:
+    """Ringkas referensi eksternal yang lolos ranking untuk fact-check essay."""
+    if not top_references:
+        return ""
+
+    lines = ["REFERENSI EKSTERNAL TERPILIH:"]
+    for idx, ref in enumerate(top_references[:5], 1):
+        title = ref.get("title", "Untitled")
+        source = ref.get("source", "unknown")
+        year = ref.get("year", "N/A")
+        snippet = (ref.get("snippet") or "").strip()[:220]
+        lines.append(f"[{idx}] ({source}, {year}) {title}")
+        if snippet:
+            lines.append(f"    {snippet}")
+    return "\n".join(lines)
+
+
 async def essay_agent_node(state: ReviewEngineState) -> dict:
     """Merakit review_context akhir sebelum scoring berdasarkan ketersediaan evidence web."""
     analysis_id = state.get("analysis_id", "unknown")
@@ -15,38 +33,25 @@ async def essay_agent_node(state: ReviewEngineState) -> dict:
     
     agent_context = state.get("agent_context", "")
     run_search = state.get("run_essay_web_search", False)
+    top_references = state.get("top_references", [])
     
-    # Kumpulkan evidence web jika pencarian dijalankan
-    web_evidence = ""
-    if run_search:
-        # Prioritas 1: Ambil dari evidence chunks (jika ada)
-        chunks = state.get("evidence_chunks", [])
-        if chunks:
-            web_evidence = "BUKTI FAKTUAL DARI PENCARIAN WEB:\n"
-            for c in chunks:
-                web_evidence += f"- {c.get('content', '')}\n"
-        else:
-            # Prioritas 2: Ambil dari top references
-            refs = state.get("top_references", [])
-            if refs:
-                web_evidence = "REFERENSI WEB:\n"
-                for r in refs:
-                    web_evidence += f"- [{r.get('title', 'No Title')}] {r.get('snippet', '')}\n"
+    # Kumpulkan evidence eksternal hanya dari hasil retrieval, bukan evidence_chunks internal dokumen.
+    external_references = _build_external_reference_block(top_references) if run_search else ""
 
-    # Jika pencarian tidak dijalankan atau tidak menemukan apa-apa
-    if not web_evidence:
-        web_info_status = "(Pencarian web eksternal tidak digunakan, evaluasi murni internal essay)."
+    if not run_search:
+        external_status = "(Pencarian eksternal tidak dijalankan; evaluasi fokus pada kualitas argumen internal essay.)"
+    elif external_references:
+        external_status = "(Pencarian eksternal dijalankan; referensi di bawah dapat dipakai untuk verifikasi klaim faktual.)"
     else:
-        web_info_status = "(Dilengkapi dengan pengecekan fakta web)."
+        external_status = "(Pencarian eksternal dijalankan, tetapi tidak ada referensi yang lolos ranking untuk verifikasi kuat.)"
 
-    # Rakit ulasan akhir
     review_context = f"""=== TEKS ESAI UTAMA ===
 {agent_context}
 
-=== STATUS & BUKTI EKSTERNAL ===
-{web_info_status}
+=== STATUS VERIFIKASI EKSTERNAL ===
+{external_status}
 
-{web_evidence}
+{external_references}
 """
     
     await log_step(analysis_id, "synthesis", "done", "Konteks telah disintesis.")

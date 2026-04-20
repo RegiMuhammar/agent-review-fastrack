@@ -9,6 +9,7 @@ import pytest
 from app.graph.state import ReviewEngineState
 from app.graph.builder import (
     route_after_extract,
+    route_after_search_rank,
     route_by_doc_type,
     review_pipeline,
 )
@@ -55,6 +56,18 @@ class TestRouteByDocType:
 
 # ── GRAPH STRUCTURE TESTS ────────────────────────────────────────────────────
 
+class TestRouteAfterSearchRank:
+    """Test routing setelah ranking retrieval."""
+
+    def test_essay_skips_evidence_select(self):
+        state: ReviewEngineState = {"doc_type": "essay"}  # type: ignore
+        assert route_after_search_rank(state) == "essay_agent"
+
+    def test_research_continues_to_evidence_select(self):
+        state: ReviewEngineState = {"doc_type": "research"}  # type: ignore
+        assert route_after_search_rank(state) == "evidence_select"
+
+
 class TestGraphStructure:
     """Test graph compiled dengan benar setelah Fase 0-9."""
 
@@ -85,6 +98,7 @@ class TestGraphStructure:
         edges = review_pipeline.get_graph().edges
         edge_pairs = {(e.source, e.target) for e in edges}
 
+        assert ("search_rank", "essay_agent") in edge_pairs
         assert ("essay_agent", "score") in edge_pairs
         assert ("score", "generate") in edge_pairs
 
@@ -150,6 +164,14 @@ class TestNodeFallbacks:
         assert result["ranked_results"] == []
         assert result["top_references"] == []
 
+    def test_temporal_alignment_prefers_contemporary_references(self):
+        """Ranking temporal harus lebih menyukai referensi yang dekat dengan tahun paper target."""
+        from app.graph.nodes.search_rank import _temporal_alignment_score
+
+        older_but_contemporary = _temporal_alignment_score(2016, 2017)
+        much_newer = _temporal_alignment_score(2024, 2017)
+        assert older_but_contemporary > much_newer
+
     def test_generate_node_essay(self):
         """generate_node harus bekerja untuk essay (backward compat)."""
         from app.graph.nodes.generate import generate_node
@@ -163,7 +185,7 @@ class TestNodeFallbacks:
             "score_overall": 7.5,
             "summary": "Good essay",
             "dimensions_feedback": [
-                {"key": "thesis_clarity", "label": "Tesis", "score": 8.0, "feedback": "Bagus"},
+                {"key": "thesis_clarity", "label": "Tesis", "score": 9.2, "feedback": "Bagus"},
                 {"key": "writing_style_clarity", "label": "Gaya", "score": 5.0, "feedback": "Perlu perbaikan"},
             ],
             "overall_feedback": "Overall OK",
@@ -214,3 +236,30 @@ class TestNodeFallbacks:
         assert fr["references"][0]["title"] == "BERT"
         assert "pipeline_stats" in fr
         assert fr["pipeline_stats"]["references_selected"] == 1
+
+    def test_essay_agent_uses_external_references_not_internal_chunks(self):
+        """Essay agent tidak boleh salah menyebut evidence_chunks internal sebagai bukti web."""
+        from app.graph.nodes.essay_agent import essay_agent_node
+        import asyncio
+
+        state: ReviewEngineState = {
+            "analysis_id": "essay-search",
+            "agent_context": "Esai membahas dampak AI pada pendidikan.",
+            "run_essay_web_search": True,
+            "evidence_chunks": [
+                {"section": "head", "content": "Ini potongan internal dokumen."}
+            ],
+            "top_references": [
+                {
+                    "title": "AI in Education Review",
+                    "source": "tavily",
+                    "year": 2024,
+                    "snippet": "Recent review of AI adoption in classrooms.",
+                }
+            ],
+        }  # type: ignore
+
+        result = asyncio.run(essay_agent_node(state))
+        review_context = result["review_context"]
+        assert "AI in Education Review" in review_context
+        assert "Ini potongan internal dokumen." not in review_context
