@@ -11,42 +11,56 @@ Output: agent_context yang terstruktur memuat keseluruhan dokumen draft rancanga
 from app.services.laravel_client import log_step
 from app.graph.state import ReviewEngineState
 
+
 async def bizplan_document_profile_node(state: ReviewEngineState) -> dict:
-    """Prepare context dan (jika MVP nantinya ditambah) external search queries untuk bizplan."""
+    """Siapkan konteks awal dan placeholder search query untuk jalur bizplan."""
     analysis_id = state.get("analysis_id", "unknown")
-    
-    print(f"\n[bizplan_document_profile] Memulai persiapan context business plan...")
-    await log_step(analysis_id, "preparing", "processing", "Menyiapkan analisis rancangan bisnis (Business Plan)...")
+
+    print("\n[bizplan_document_profile] Memulai persiapan konteks business plan...")
+    await log_step(analysis_id, "preparing", "processing", "Menyiapkan konteks awal business plan...")
 
     title = state.get("title") or "Business Plan"
     raw_markdown = state.get("raw_markdown") or ""
-    
-    # Bizplan context builder
-    # Untuk plan bisnis, kita beri instruksi implisit ke LLM dengan pembatas terstruktur
+    company_name = state.get("company_name") or title
+    industry = state.get("industry") or "Tidak diketahui"
+    geography = state.get("geography") or "Tidak diketahui"
+    business_stage = state.get("business_stage") or "Tidak diketahui"
+    target_customer = state.get("target_customer") or []
+    funding_ask = state.get("funding_ask") or "Tidak disebutkan"
+    revenue_model = state.get("revenue_model") or []
+
     context_builder = [
         "===========================================================",
-        f" DOKUMEN BUSINESS PLAN: {title}",
+        f" DOKUMEN RENCANA BISNIS: {title}",
         "===========================================================",
         "",
-        "Dokumen berikut adalah narasi business plan. Mohon perhatikan:",
-        "- Problem & Solution Statement",
-        "- Market Analysis & Size",
-        "- Business Model & Revenue Streams",
-        "- Competitive Advantage",
-        "- Tim dan Proyeksi Finansial",
+        "Snapshot awal business plan:",
+        f"- Nama usaha/perusahaan: {company_name}",
+        f"- Industri: {industry}",
+        f"- Geografi: {geography}",
+        f"- Tahap bisnis: {business_stage}",
+        f"- Pendanaan yang dicari: {funding_ask}",
+        f"- Target pelanggan: {', '.join(target_customer) if target_customer else 'Belum jelas'}",
+        f"- Model pendapatan awal: {', '.join(revenue_model) if revenue_model else 'Belum jelas'}",
         "",
-        "--- START OF DOCUMENT ---",
-        raw_markdown[:8000],  # Ambil porsi cukup besar dari awal
-        "--- END OF DOCUMENT ---"
+        "Dokumen berikut adalah narasi business plan. Mohon perhatikan:",
+        "- Rumusan masalah dan solusi",
+        "- Analisis pasar dan ukuran peluang",
+        "- Model bisnis dan sumber pendapatan",
+        "- Keunggulan kompetitif",
+        "- Tim, eksekusi, dan proyeksi finansial",
+        "",
+        "--- AWAL DOKUMEN ---",
+        raw_markdown[:8000],
+        "--- AKHIR DOKUMEN ---",
     ]
-    
+
     agent_context = "\n".join(context_builder)
-    
-    search_queries = {}  # MVP: bizplan blm pakai external search API
-    
+    search_queries = {}
+
     print(f"[bizplan_document_profile] Konteks disiapkan: {len(agent_context)} karakter.")
-    await log_step(analysis_id, "preparing", "done", "Konteks Business Plan siap")
-    
+    await log_step(analysis_id, "preparing", "done", "Konteks awal business plan siap.")
+
     return {
         "agent_context": agent_context,
         "search_queries": search_queries,

@@ -73,6 +73,18 @@ def _build_references_output(top_references: list[dict]) -> list[dict]:
     return refs_output
 
 
+def _build_bizplan_snapshot(state: ReviewEngineState) -> dict:
+    return {
+        "company_name": state.get("company_name"),
+        "industry": state.get("industry"),
+        "geography": state.get("geography"),
+        "business_stage": state.get("business_stage"),
+        "funding_ask": state.get("funding_ask"),
+        "target_customer": state.get("target_customer", []),
+        "revenue_model": state.get("revenue_model", []),
+    }
+
+
 async def generate_node(state: ReviewEngineState) -> dict:
     """
     Node akhir: Menyusun final_result yang informatif.
@@ -111,6 +123,10 @@ async def generate_node(state: ReviewEngineState) -> dict:
         "authors": state.get("authors", []),
         "keywords": state.get("keywords", []),
         "abstract": (state.get("abstract") or "")[:500],
+        "company_name": state.get("company_name"),
+        "industry": state.get("industry"),
+        "geography": state.get("geography"),
+        "business_stage": state.get("business_stage"),
     }
 
     # ─── References (Now enabled for all doc_types!) ──────────────────────
@@ -134,8 +150,42 @@ async def generate_node(state: ReviewEngineState) -> dict:
             "references_selected": len(top_refs),
             "evidence_chunks": evidence_chunks_count,
         }
+    elif doc_type == "bizplan":
+        final_result["profile"] = {
+            "domain": state.get("domain"),
+            "sub_domain": state.get("sub_domain"),
+            "target_customer": state.get("target_customer", []),
+            "funding_ask": state.get("funding_ask"),
+            "traction_signals": state.get("traction_signals", []),
+            "pricing_signals": state.get("pricing_signals", []),
+        }
+        final_result["business_snapshot"] = _build_bizplan_snapshot(state)
+        final_result["financial_metrics"] = state.get("financial_metrics") or {
+            "pricing": state.get("pricing", []),
+            "revenue_model": state.get("revenue_model", []),
+            "cac": None,
+            "ltv": None,
+            "gross_margin": None,
+            "burn_rate": state.get("burn_rate"),
+            "runway_months": state.get("runway_months"),
+            "break_even_timeline": state.get("break_even_timeline"),
+            "funding_needed": state.get("funding_ask"),
+        }
+        final_result["financial_red_flags"] = state.get("financial_red_flags", [])
+        final_result["unit_economics_signals"] = state.get("unit_economics_signals") or {}
+        final_result["market_validation"] = state.get("market_validation") or {
+            "status": state.get("market_validation_status"),
+            "market_size_summary": "",
+            "evidence": [],
+        }
+        final_result["competition_insights"] = state.get("competition_insights") or {
+            "direct_competitors": [],
+            "substitutes": [],
+            "key_risk": "",
+        }
+        final_result["market_red_flags"] = state.get("market_red_flags", [])
     else:
-        # Essay/bizplan basic profile
+        # Essay basic profile
         final_result["profile"] = {
             "domain": state.get("domain"),
             "sub_domain": state.get("sub_domain"),

@@ -24,12 +24,37 @@ class ReviewEngineState(TypedDict):
     document_head:  str          # ~3000-4000 karakter awal dokumen
     document_tail:  str          # ~1000-2000 karakter akhir dokumen
 
+    # Bizplan metadata (Fase 4A)
+    company_name:      str | None
+    industry:          str | None
+    target_customer:   list[str]
+    geography:         str | None
+    business_stage:    str | None
+    funding_ask:       str | None
+    traction_signals:  list[str]
+    pricing_signals:   list[str]
+
     # Document Profile (Fase 3 — diisi oleh research_document_profile node)
     domain:           str | None           # e.g. "computer_science", "medicine"
     sub_domain:       str | None           # e.g. "natural_language_processing"
     paper_type:       str | None           # e.g. "empirical", "survey", "method"
     retrieval_focus:  list[str]            # e.g. ["prior_work", "benchmark"]
 
+    # Bizplan financials (Fase 4B)
+    revenue_model:          list[str]
+    pricing:                list[str]
+    financial_metrics:      dict[str, object]
+    burn_rate:              str | None
+    runway_months:          float | None
+    break_even_timeline:    str | None
+    unit_economics_signals: dict[str, object]
+    financial_red_flags:    list[str]
+    external_market_evidence: list[dict]
+    competitive_evidence:    list[dict]
+    market_validation_status: str | None
+    market_validation:        dict[str, object]
+    competition_insights:     dict[str, object]
+    market_red_flags:         list[str]
 
     # Agent prep
     agent_context: str
