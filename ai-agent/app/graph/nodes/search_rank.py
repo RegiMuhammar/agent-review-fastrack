@@ -25,6 +25,7 @@ Flow: ... → search_execute → search_rank → research_agent → ...
 import json
 import logging
 import re
+from urllib.parse import urlparse
 
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -39,12 +40,361 @@ TOP_K = 5
 
 # Threshold minimal untuk masuk top_references
 MIN_RELEVANCE_THRESHOLD = 0.3
+BIZPLAN_MIN_RELEVANCE_THRESHOLD = 0.45
+
+ROLE_HINTS = {
+    "competition": [
+        "competitor",
+        "competitors",
+        "competition",
+        "competitive",
+        "rival",
+        "alternative",
+        "alternatives",
+        "pesaing",
+        "kompetitor",
+        "kompetisi",
+    ],
+    "pricing": [
+        "pricing",
+        "price",
+        "harga",
+        "tarif",
+        "benchmark",
+        "subscription",
+        "fee",
+        "license",
+        "lisensi",
+    ],
+    "market": [
+        "market",
+        "pasar",
+        "industry",
+        "industri",
+        "growth",
+        "adoption",
+        "permintaan",
+        "benchmark",
+    ],
+}
+
+DISCOVERY_COMPETITION_HINTS = [
+    "top ",
+    "best ",
+    "leading ",
+    "alternatives to",
+    "alternative to",
+    "vs ",
+    "compare",
+    "comparison",
+    "vendor",
+    "vendors",
+    "provider",
+    "providers",
+]
+
+PRODUCT_CATEGORY_HINTS = [
+    "software",
+    "platform",
+    "system",
+    "suite",
+    "dashboard",
+    "erp",
+    "solution",
+    "solutions",
+    "tool",
+    "tools",
+    "app",
+]
+
+COMPETITION_FALSE_POSITIVE_HINTS = [
+    "competitive landscape",
+    "market overview",
+    "market segmentation",
+]
+
+NOISE_BIZPLAN_HINTS = [
+    "investor",
+    "investors",
+    "venture capital",
+    "consulting",
+    "consultancy",
+    "payroll",
+    "hris",
+    "attendance",
+    "home education",
+    "homeschool",
+]
+
+INDUSTRY_TERMS = {
+    "Pendidikan": ["education", "edtech", "school", "campus", "university", "student", "learning"],
+    "SaaS": ["saas", "software", "platform", "dashboard", "subscription"],
+    "Logistik": ["logistics", "logistic", "delivery", "fleet", "warehouse", "freight", "supply chain"],
+    "Fintech": ["fintech", "payment", "lending", "wallet", "banking"],
+    "Kesehatan": ["health", "healthtech", "medical", "clinic", "hospital"],
+    "Pertanian": ["agri", "agritech", "farm", "farming", "crop", "agriculture"],
+}
+
+OFF_POSITION_HINTS = [
+    "warehouse",
+    "fleet",
+    "freight",
+    "shipping",
+    "manufacturing",
+    "mining",
+    "oil and gas",
+]
+
+LOW_SIGNAL_DOMAIN_HINTS = [
+    "linkedin.com",
+    "medium.com",
+    "facebook.com",
+    "instagram.com",
+    "tiktok.com",
+    "youtube.com",
+    "x.com",
+    "twitter.com",
+    "pinterest.com",
+]
+
+TRUSTED_BIZPLAN_DOMAIN_HINTS = [
+    "statista.com",
+    "unesco.org",
+    ".gov",
+    ".edu",
+    ".ac.",
+    "imarcgroup.com",
+    "gmiresearch.com",
+    "nexdigm.com",
+    "openeducat.org",
+    "marketresearch.com",
+    "kenresearch.com",
+]
+
+BIZPLAN_EXCLUDED_DOMAIN_HINTS = [
+    "linkedin.com",
+    "facebook.com",
+    "instagram.com",
+    "tiktok.com",
+    "pinterest.com",
+]
 
 # ── HEURISTIC SCORING ────────────────────────────────────────────────────────
 
 def _normalize(text: str) -> set[str]:
     """Normalize teks ke set of lowercase words."""
     return set(re.sub(r"[^\w\s]", "", text.lower()).split())
+
+
+def _safe_preview(text: str, limit: int = 60) -> str:
+    preview = (text or "")[:limit]
+    return preview.encode("cp1252", errors="replace").decode("cp1252", errors="replace")
+
+
+def _token_list(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", (text or "").lower())
+
+
+def _bizplan_phrases(state: ReviewEngineState) -> list[str]:
+    phrases: list[str] = []
+    for value in [
+        state.get("company_name"),
+        state.get("industry"),
+        state.get("title"),
+    ]:
+        if isinstance(value, str) and value.strip():
+            phrases.append(value.strip())
+
+    for collection_key in ["target_customer", "keywords", "revenue_model", "pricing_signals"]:
+        for item in state.get(collection_key) or []:
+            if isinstance(item, str) and item.strip():
+                phrases.append(item.strip())
+
+    industry = state.get("industry") or ""
+    for term in INDUSTRY_TERMS.get(industry, []):
+        phrases.append(term)
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for phrase in phrases:
+        normalized = phrase.lower()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(phrase)
+    return deduped
+
+
+def _phrase_overlap_score(haystack: str, phrases: list[str], max_score: float) -> float:
+    score = 0.0
+    matched = 0
+    haystack_tokens = set(_token_list(haystack))
+    for phrase in phrases:
+        lowered = phrase.lower()
+        if lowered in haystack:
+            matched += 1
+            score += 0.12
+            continue
+
+        phrase_tokens = [token for token in _token_list(phrase) if len(token) >= 4]
+        if phrase_tokens and len(haystack_tokens & set(phrase_tokens)) >= min(2, len(phrase_tokens)):
+            matched += 1
+            score += 0.08
+        if matched >= 4:
+            break
+    return min(score, max_score)
+
+
+def _classify_bizplan_reference_role(result: dict) -> str:
+    haystack = f"{result.get('title', '')} {result.get('snippet', '')}".lower()
+    if any(token in haystack for token in COMPETITION_FALSE_POSITIVE_HINTS) and "market" in haystack:
+        return "market"
+    if any(token in haystack for token in ROLE_HINTS["competition"]):
+        return "competition"
+    if _looks_like_competitor_landscape(result):
+        return "competition"
+    if any(token in haystack for token in ROLE_HINTS["pricing"]):
+        return "pricing"
+    if any(token in haystack for token in ROLE_HINTS["market"]):
+        return "market"
+    return "general"
+
+
+def _looks_like_competitor_landscape(result: dict) -> bool:
+    title = (result.get("title") or "").lower()
+    snippet = (result.get("snippet") or "").lower()
+    haystack = f"{title} {snippet}"
+
+    has_discovery_hint = any(hint in haystack for hint in DISCOVERY_COMPETITION_HINTS)
+    has_product_hint = any(hint in haystack for hint in PRODUCT_CATEGORY_HINTS)
+    if any(hint in haystack for hint in COMPETITION_FALSE_POSITIVE_HINTS):
+        return False
+    geography_patterns = [
+        " in indonesia",
+        " for universities",
+        " for campuses",
+        " higher education",
+        " campus operations",
+    ]
+    has_context_hint = any(pattern in haystack for pattern in geography_patterns)
+
+    if "alternatives to" in haystack or "alternative to" in haystack or " vs " in haystack:
+        return True
+    return has_discovery_hint and has_product_hint and has_context_hint
+
+
+def _bizplan_noise_penalty(haystack: str, role: str, state: ReviewEngineState) -> float:
+    penalty = 0.0
+    customer_phrases = list(state.get("target_customer") or [])
+    customer_phrases.extend(INDUSTRY_TERMS.get(state.get("industry") or "", []))
+    customer_alignment = _phrase_overlap_score(haystack, customer_phrases, max_score=0.16)
+    product_alignment = 0.08 if any(hint in haystack for hint in PRODUCT_CATEGORY_HINTS) else 0.0
+
+    if any(hint in haystack for hint in NOISE_BIZPLAN_HINTS):
+        penalty += 0.22
+    if role == "general" and customer_alignment == 0 and product_alignment == 0:
+        penalty += 0.18
+    if role in {"competition", "pricing"} and product_alignment == 0:
+        penalty += 0.14
+    if role == "competition" and any(hint in haystack for hint in COMPETITION_FALSE_POSITIVE_HINTS):
+        penalty += 0.22
+    return penalty
+
+
+def _bizplan_domain_score(result: dict) -> float:
+    url = (result.get("url") or "").lower()
+    if not url:
+        return 0.0
+    domain = urlparse(url).netloc.lower()
+    if any(hint in domain for hint in LOW_SIGNAL_DOMAIN_HINTS):
+        return -0.18
+    if any(hint in domain for hint in TRUSTED_BIZPLAN_DOMAIN_HINTS):
+        return 0.12
+    if domain.endswith(".org") or domain.endswith(".edu"):
+        return 0.08
+    return 0.0
+
+
+def _is_excluded_bizplan_domain(result: dict) -> bool:
+    url = (result.get("url") or "").lower()
+    if not url:
+        return False
+    domain = urlparse(url).netloc.lower()
+    return any(hint in domain for hint in BIZPLAN_EXCLUDED_DOMAIN_HINTS)
+
+
+def _bizplan_reference_score(result: dict, state: ReviewEngineState, target_year: int | None) -> float:
+    haystack = f"{result.get('title', '')} {result.get('snippet', '')}".lower()
+    phrases = _bizplan_phrases(state)
+    match_score = _phrase_overlap_score(haystack, phrases, max_score=0.45)
+
+    geography = (state.get("geography") or "").lower()
+    geography_score = 0.08 if geography and geography in haystack else 0.0
+
+    role = _classify_bizplan_reference_role(result)
+    role_score = {"market": 0.12, "competition": 0.12, "pricing": 0.1, "general": 0.04}[role]
+    customer_score = _phrase_overlap_score(
+        haystack,
+        list(state.get("target_customer") or []) + INDUSTRY_TERMS.get(state.get("industry") or "", []),
+        max_score=0.16,
+    )
+    product_score = 0.08 if any(hint in haystack for hint in PRODUCT_CATEGORY_HINTS) else 0.0
+
+    source_weights = {
+        "semanticscholar": 0.12,
+        "arxiv": 0.10,
+        "tavily": 0.08,
+    }
+    source_score = source_weights.get(result.get("source", ""), 0.06)
+    recency = _temporal_alignment_score(result.get("year"), target_year) * 0.08
+    snippet_quality = min(len(result.get("snippet", "")) / 240, 1.0) * 0.08
+    domain_score = _bizplan_domain_score(result)
+
+    positive_overlap = match_score + geography_score + customer_score + product_score
+    penalty = 0.0
+    if positive_overlap < 0.18 and any(hint in haystack for hint in OFF_POSITION_HINTS):
+        penalty = 0.18
+    penalty += _bizplan_noise_penalty(haystack, role, state)
+
+    score = positive_overlap + role_score + source_score + recency + snippet_quality + domain_score - penalty
+    return round(max(min(score, 1.0), 0.0), 3)
+
+
+def _select_bizplan_top_references(ranked_results: list[dict], threshold: float) -> list[dict]:
+    selected: list[dict] = []
+    selected_urls: set[str] = set()
+
+    for role in ["market", "competition", "pricing"]:
+        for result in ranked_results:
+            if result.get("reference_role") != role:
+                continue
+            if result.get("relevance_score", 0.0) < threshold:
+                continue
+            if _is_excluded_bizplan_domain(result):
+                continue
+            url = result.get("url") or result.get("title")
+            if url in selected_urls:
+                continue
+            selected.append(result)
+            selected_urls.add(url)
+            break
+
+    for result in ranked_results:
+        if result.get("relevance_score", 0.0) < threshold:
+            continue
+        if _is_excluded_bizplan_domain(result):
+            continue
+        if result.get("reference_role") == "general" and result.get("relevance_score", 0.0) < threshold + 0.12:
+            continue
+        url = result.get("url") or result.get("title")
+        if url in selected_urls:
+            continue
+        selected.append(result)
+        selected_urls.add(url)
+        if len(selected) >= TOP_K:
+            break
+
+    return selected[:TOP_K]
 
 
 def _temporal_alignment_score(result_year: int | None, target_year: int | None) -> float:
@@ -163,14 +513,42 @@ Index sesuai posisi di daftar input (0-based).
 Score: 0.0 = tidak relevan, 1.0 = sangat relevan.
 """
 
+BIZPLAN_RERANK_SYSTEM_PROMPT = """Kamu adalah analis VC yang sedang mereranking referensi eksternal untuk validasi business plan.
+Diberikan snapshot bisnis dan daftar hasil pencarian web, beri skor relevansi untuk setiap hasil.
+
+Kriteria scoring (gabungkan menjadi skor 0.0-1.0):
+- Kesesuaian wedge bisnis: seberapa dekat dengan produk, customer, dan positioning startup
+- Kegunaan validasi pasar: apakah membantu memvalidasi ukuran pasar atau demand
+- Kegunaan validasi pricing: apakah membantu memahami benchmark harga atau monetisasi
+- Kegunaan validasi kompetisi: apakah menyebut pemain pembanding, alternatif, atau lanskap kompetitor yang nyata
+- Kesesuaian geografi: utamakan hasil yang relevan dengan wilayah target
+
+Turunkan skor jika hasil terlalu generik, terlalu akademik tanpa kaitan pasar, atau tidak membantu investor memahami kompetisi/pricing.
+
+Jawab HANYA dengan JSON valid (tanpa markdown fences):
+{
+  "scores": [
+    {"index": 0, "score": 0.95, "reason": "satu kalimat"},
+    {"index": 1, "score": 0.40, "reason": "satu kalimat"}
+  ]
+}
+"""
+
 
 async def _llm_rerank(candidates: list[dict], state: ReviewEngineState) -> list[dict] | None:
     """
     LLM rerank untuk kandidat teratas. Return None jika gagal.
     """
+    doc_type = state.get("doc_type", "research")
     title = state.get("title") or ""
     abstract = state.get("abstract") or ""
     domain = state.get("domain") or "general"
+    company_name = state.get("company_name") or title
+    industry = state.get("industry") or ""
+    geography = state.get("geography") or ""
+    target_customer = ", ".join((state.get("target_customer") or [])[:3])
+    revenue_model = ", ".join((state.get("revenue_model") or [])[:3])
+    pricing_signals = ", ".join((state.get("pricing_signals") or [])[:2])
 
     # Build compact list
     results_text = "\n".join(
@@ -180,11 +558,25 @@ async def _llm_rerank(candidates: list[dict], state: ReviewEngineState) -> list[
         for i, r in enumerate(candidates)
     )
 
-    user_content = (
-        f"Paper Target:\nTitle: {title}\nDomain: {domain}\n"
-        f"Abstract: {abstract[:600]}\n\n"
-        f"Hasil Pencarian untuk Di-ranking:\n{results_text}"
-    )
+    if doc_type == "bizplan":
+        system_prompt = BIZPLAN_RERANK_SYSTEM_PROMPT
+        user_content = (
+            f"Business Snapshot:\n"
+            f"Company: {company_name}\n"
+            f"Industry: {industry}\n"
+            f"Geography: {geography}\n"
+            f"Target Customer: {target_customer}\n"
+            f"Revenue Model: {revenue_model}\n"
+            f"Pricing Signals: {pricing_signals}\n\n"
+            f"Hasil Pencarian untuk Di-ranking:\n{results_text}"
+        )
+    else:
+        system_prompt = RERANK_SYSTEM_PROMPT
+        user_content = (
+            f"Paper Target:\nTitle: {title}\nDomain: {domain}\n"
+            f"Abstract: {abstract[:600]}\n\n"
+            f"Hasil Pencarian untuk Di-ranking:\n{results_text}"
+        )
 
     try:
         llm = ChatGroq(
@@ -194,7 +586,7 @@ async def _llm_rerank(candidates: list[dict], state: ReviewEngineState) -> list[
         )
 
         response = await llm.ainvoke([
-            SystemMessage(content=RERANK_SYSTEM_PROMPT),
+            SystemMessage(content=system_prompt),
             HumanMessage(content=user_content),
         ])
 
@@ -211,6 +603,9 @@ async def _llm_rerank(candidates: list[dict], state: ReviewEngineState) -> list[
             idx = s.get("index", -1)
             score = float(s.get("score", 0.5))
             if 0 <= idx < len(reranked):
+                if doc_type == "bizplan":
+                    base_score = float(reranked[idx].get("relevance_score", 0.5))
+                    score = round((base_score * 0.7) + (score * 0.3), 3)
                 reranked[idx] = {**reranked[idx], "relevance_score": score}
 
         # Sort descending
@@ -255,6 +650,7 @@ async def search_rank_node(state: ReviewEngineState) -> dict:
     """
     analysis_id = state.get("analysis_id", "unknown")
     search_results = state.get("search_results") or []
+    doc_type = state.get("doc_type", "research")
 
     print(f"\n[search_rank] Memulai ranking {len(search_results)} hasil...")
     _safe_log(analysis_id, "ranking", "processing", f"Meranking {len(search_results)} referensi...")
@@ -273,15 +669,23 @@ async def search_rank_node(state: ReviewEngineState) -> dict:
 
     scored = []
     for r in search_results:
-        h_score = _heuristic_score(r, paper_words, paper_keywords, target_year)
-        scored.append({**r, "relevance_score": h_score})
+        if doc_type == "bizplan":
+            h_score = _bizplan_reference_score(r, state, target_year)
+            scored.append({
+                **r,
+                "reference_role": _classify_bizplan_reference_role(r),
+                "relevance_score": h_score,
+            })
+        else:
+            h_score = _heuristic_score(r, paper_words, paper_keywords, target_year)
+            scored.append({**r, "relevance_score": h_score})
 
     # Sort descending
     scored.sort(key=lambda x: x["relevance_score"], reverse=True)
 
     print(f"[search_rank] Heuristic scoring selesai:")
     for i, r in enumerate(scored[:5]):
-        print(f"  #{i+1} [{r['relevance_score']:.3f}] {r['title'][:60]}")
+        print(f"  #{i+1} [{r['relevance_score']:.3f}] {_safe_preview(r['title'])}")
 
     # ─── Step 2: Optional LLM rerank (hanya jika >5 kandidat) ────────────
     use_llm_rerank = len(scored) > 5
@@ -307,17 +711,20 @@ async def search_rank_node(state: ReviewEngineState) -> dict:
         print(f"[search_rank] Skip LLM rerank ({len(scored)} kandidat ≤ 5)")
 
     # ─── Step 3: Select top references ────────────────────────────────────
-    top_references = [
-        r for r in ranked_results[:TOP_K]
-        if r["relevance_score"] >= MIN_RELEVANCE_THRESHOLD
-    ]
+    if doc_type == "bizplan":
+        top_references = _select_bizplan_top_references(ranked_results, BIZPLAN_MIN_RELEVANCE_THRESHOLD)
+    else:
+        top_references = [
+            r for r in ranked_results[:TOP_K]
+            if r["relevance_score"] >= MIN_RELEVANCE_THRESHOLD
+        ]
 
     summary = f"Ranking selesai — {len(top_references)} referensi terpilih dari {len(ranked_results)}"
     print(f"[search_rank] {summary}")
     if top_references:
         print(f"[search_rank] Top referensi:")
         for i, r in enumerate(top_references):
-            print(f"  #{i+1} [{r['relevance_score']:.3f}] [{r['source']}] {r['title'][:60]}")
+            print(f"  #{i+1} [{r['relevance_score']:.3f}] [{r['source']}] {_safe_preview(r['title'])}")
 
     _safe_log(analysis_id, "ranking", "done", summary)
 

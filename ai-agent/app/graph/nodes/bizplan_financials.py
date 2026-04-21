@@ -39,6 +39,7 @@ REVENUE_MODEL_PATTERNS = [
 PRICING_HINTS = [
     "harga",
     "pricing",
+    "price",
     "langganan",
     "subscription",
     "paket",
@@ -47,6 +48,83 @@ PRICING_HINTS = [
     "rp",
     "$",
     "usd",
+    "starter",
+    "growth",
+    "enterprise",
+    "per bulan",
+    "per tahun",
+]
+
+PRICING_STRONG_HINTS = [
+    "harga",
+    "pricing",
+    "price",
+    "paket",
+    "starter",
+    "growth",
+    "enterprise",
+    "subscription",
+    "langganan",
+    "tarif",
+    "fee",
+]
+
+NON_PRICING_METRIC_HINTS = [
+    "tam",
+    "sam",
+    "som",
+    "mrr",
+    "arr",
+    "gmv",
+    "tpv",
+    "cac",
+    "ltv",
+    "burn rate",
+    "monthly burn",
+    "cash burn",
+    "runway",
+    "gross margin",
+    "margin kotor",
+    "revenue",
+    "pendapatan",
+]
+
+RISK_FINANCIAL_HINTS = [
+    "modal kerja",
+    "working capital",
+    "reimbursement",
+    "cash flow",
+    "arus kas",
+    "burn",
+    "runway",
+    "collection",
+]
+
+RISK_CONTEXT_HINTS = [
+    "risiko",
+    "risk",
+    "red flag",
+    "warning",
+    "perlu diwaspadai",
+    "masih dipantau",
+    "bisa",
+    "dapat",
+    "could",
+    "may",
+    "if",
+    "jika",
+    "bergantung",
+    "depend",
+    "melambat",
+    "delay",
+]
+
+OCR_ARTIFACT_HINTS = [
+    "start of picture text",
+    "end of picture text",
+    "picture text",
+    "image text",
+    "ocr text",
 ]
 
 
@@ -84,6 +162,29 @@ def _split_sentences(text: str) -> list[str]:
     return [sentence for sentence in sentences if len(sentence) >= 20]
 
 
+def _is_signal_noise(sentence: str) -> bool:
+    lowered = sentence.lower()
+    if any(hint in lowered for hint in OCR_ARTIFACT_HINTS):
+        return True
+    if "<br>" in lowered:
+        return True
+
+    metric_tokens = sum(1 for token in ["mrr", "arr", "gmv", "loi", "cac", "ltv"] if token in lowered)
+    numeric_tokens = len(re.findall(r"\d", sentence))
+    return metric_tokens >= 3 and numeric_tokens >= 4 and len(sentence.split()) <= 18
+
+
+def _looks_like_pricing_sentence(sentence: str) -> bool:
+    lowered = sentence.lower()
+    has_strong_keyword = any(hint in lowered for hint in PRICING_STRONG_HINTS)
+    has_period_qualifier = bool(re.search(r"\b(?:per|/)\s*(?:bulan|month|tahun|year)\b", lowered))
+    has_currency = bool(re.search(r"(?:rp|idr|usd|\$)\s?[\d]+(?:[\.,]\d+)?", lowered))
+    has_non_pricing_metric = any(hint in lowered for hint in NON_PRICING_METRIC_HINTS)
+    if has_non_pricing_metric and not has_strong_keyword:
+        return False
+    return has_strong_keyword or (has_currency and has_period_qualifier and not has_non_pricing_metric)
+
+
 def _extract_metric_phrase(text: str, patterns: list[str], max_len: int = 120) -> str | None:
     for pattern in patterns:
         match = re.search(pattern, text, re.IGNORECASE)
@@ -98,9 +199,24 @@ def _extract_pricing_signals(text: str, state: ReviewEngineState) -> list[str]:
     candidates = list(state.get("pricing_signals") or [])
     for sentence in _split_sentences(text):
         lowered = sentence.lower()
-        if any(hint in lowered for hint in PRICING_HINTS) and any(ch.isdigit() for ch in sentence):
+        if (
+            _looks_like_pricing_sentence(sentence)
+            and any(ch.isdigit() for ch in sentence)
+            and not _is_signal_noise(sentence)
+        ):
             candidates.append(sentence)
     return _unique_keep_order(candidates)[:5]
+
+
+def _extract_explicit_risk_sentences(text: str) -> list[str]:
+    matches = []
+    for sentence in _split_sentences(text):
+        lowered = sentence.lower()
+        has_financial_exposure = any(hint in lowered for hint in RISK_FINANCIAL_HINTS)
+        has_risk_context = any(hint in lowered for hint in RISK_CONTEXT_HINTS)
+        if has_financial_exposure and has_risk_context:
+            matches.append(sentence)
+    return _unique_keep_order(matches)[:3]
 
 
 def _extract_revenue_model(text: str) -> list[str]:
@@ -270,6 +386,7 @@ async def bizplan_financials_node(state: ReviewEngineState) -> dict:
     }
 
     financial_red_flags: list[str] = []
+    explicit_risks = _extract_explicit_risk_sentences(text)
     if not revenue_model:
         financial_red_flags.append("Model pendapatan belum tergambar jelas.")
     if not pricing:
@@ -284,6 +401,10 @@ async def bizplan_financials_node(state: ReviewEngineState) -> dict:
         financial_red_flags.append("Runway belum dapat diestimasi.")
     if not break_even_timeline:
         financial_red_flags.append("Asumsi break-even belum dijelaskan.")
+    for risk in explicit_risks:
+        financial_red_flags.append(risk)
+
+    financial_red_flags = _unique_keep_order(financial_red_flags)
 
     print(f"[bizplan_financials] Revenue model: {revenue_model}")
     print(f"[bizplan_financials] Pricing signals: {len(pricing)} | Red flags: {len(financial_red_flags)}")

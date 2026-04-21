@@ -57,6 +57,76 @@ function normalizeList(value) {
   return Array.isArray(value) ? value : []
 }
 
+function hasBizplanArtifact(value) {
+  const text = String(value || '').toLowerCase()
+  return (
+    text.includes('start of picture text') ||
+    text.includes('end of picture text') ||
+    text.includes('picture text') ||
+    text.includes('image text') ||
+    text.includes('ocr text')
+  )
+}
+
+function sanitizeBizplanHeadline(value, fallback = '-') {
+  const text = cleanMarkdownText(value)
+
+  if (text === '-') {
+    return fallback
+  }
+
+  const withoutMetadata = text
+    .replace(/\b(?:industry|industri|geography|geografi|funding ask|pendanaan|target customer|target pelanggan)\b\s*:.*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (!withoutMetadata || hasBizplanArtifact(withoutMetadata)) {
+    return fallback
+  }
+
+  return withoutMetadata
+}
+
+function sanitizeBizplanTextList(value) {
+  const items = normalizeList(value)
+    .map((item) => cleanMarkdownText(item))
+    .filter((item) => item !== '-' && !hasBizplanArtifact(item))
+
+  return Array.from(new Set(items))
+}
+
+function sanitizeBizplanEvidenceList(value) {
+  return normalizeList(value)
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => ({
+      ...item,
+      title: sanitizeBizplanHeadline(item.title, '-'),
+      snippet: cleanMarkdownText(item.snippet),
+    }))
+    .filter((item) => item.title !== '-' && !hasBizplanArtifact(item.snippet))
+}
+
+function normalizeBizplanMarketStatus(status, evidence, marketRedFlags) {
+  const normalized = String(status || '').trim().toLowerCase()
+  const safeEvidence = sanitizeBizplanEvidenceList(evidence)
+  const safeFlags = sanitizeBizplanTextList(marketRedFlags).map((item) => item.toLowerCase())
+
+  if (!normalized) {
+    return safeEvidence.length > 0 ? 'partial' : 'unavailable'
+  }
+
+  if (normalized === 'validated') {
+    if (safeEvidence.length === 0) {
+      return 'partial'
+    }
+    if (safeFlags.some((item) => item.includes('kompetisi') || item.includes('belum cukup relevan'))) {
+      return 'partial'
+    }
+  }
+
+  return normalized
+}
+
 function normalizeResult(rawResult) {
   if (!rawResult) {
     return {}
@@ -208,15 +278,23 @@ function AnalisisJurnalPage() {
     result?.unit_economics_signals && typeof result.unit_economics_signals === 'object'
       ? result.unit_economics_signals
       : {}
-  const marketValidation = result?.market_validation && typeof result.market_validation === 'object' ? result.market_validation : {}
+  const rawMarketValidation = result?.market_validation && typeof result.market_validation === 'object' ? result.market_validation : {}
   const competitionInsights = result?.competition_insights && typeof result.competition_insights === 'object' ? result.competition_insights : {}
-  const financialRedFlags = normalizeList(result?.financial_red_flags)
-  const marketRedFlags = normalizeList(result?.market_red_flags)
-  const companyName = cleanMarkdownText(bizplanMetadata.company_name || businessSnapshot.company_name || journalTitle)
+  const financialRedFlags = sanitizeBizplanTextList(result?.financial_red_flags)
+  const marketRedFlags = sanitizeBizplanTextList(result?.market_red_flags)
+  const companyName = sanitizeBizplanHeadline(
+    bizplanMetadata.company_name || businessSnapshot.company_name || journalTitle,
+    cleanMarkdownText(journalTitle),
+  )
   const customerSegments = normalizeList(businessSnapshot.target_customer || bizplanProfile.target_customer)
   const revenueModels = normalizeList(businessSnapshot.revenue_model || financialMetrics.revenue_model)
-  const pricingSignals = normalizeList(financialMetrics.pricing || bizplanProfile.pricing_signals)
-  const directCompetitors = normalizeList(competitionInsights.direct_competitors)
+  const pricingSignals = sanitizeBizplanTextList(financialMetrics.pricing || bizplanProfile.pricing_signals)
+  const directCompetitors = sanitizeBizplanTextList(competitionInsights.direct_competitors)
+  const marketValidation = {
+    ...rawMarketValidation,
+    evidence: sanitizeBizplanEvidenceList(rawMarketValidation?.evidence),
+    status: normalizeBizplanMarketStatus(rawMarketValidation?.status, rawMarketValidation?.evidence, marketRedFlags),
+  }
   const authorName = cleanMarkdownText(
     docType === 'bizplan'
       ? companyName

@@ -14,7 +14,33 @@ Keamanan:
 - Hanya data yang berguna untuk frontend/display
 """
 
+import re
+
 from app.graph.state import ReviewEngineState
+
+
+STRENGTH_CUES = [
+    "kuat",
+    "solid",
+    "jelas",
+    "baik",
+    "relevan",
+    "menjanjikan",
+    "unik",
+    "terukur",
+]
+
+IMPROVEMENT_CUES = [
+    "namun",
+    "tetapi",
+    "perlu",
+    "masih",
+    "belum",
+    "sebaiknya",
+    "dapat ditingkatkan",
+    "butuh",
+    "risiko",
+]
 
 
 def _safe_log(analysis_id: str, step: str, status: str, message: str) -> None:
@@ -31,29 +57,97 @@ def _safe_log(analysis_id: str, step: str, status: str, message: str) -> None:
         print(f"[generate_node][log_step] log gagal: {exc}")
 
 
+def _clean_feedback_text(text: str) -> str:
+    return " ".join((text or "").strip().split())
+
+
+def _extract_positive_clause(feedback: str) -> str:
+    feedback = _clean_feedback_text(feedback)
+    if not feedback:
+        return ""
+
+    parts = re.split(r"\b(?:Namun|Tetapi|Akan tetapi|Meski demikian|Walau demikian)\b", feedback, maxsplit=1)
+    clause = parts[0].strip(" .:-")
+    return clause or feedback
+
+
+def _extract_improvement_clause(feedback: str) -> str:
+    feedback = _clean_feedback_text(feedback)
+    if not feedback:
+        return ""
+
+    match = re.search(
+        r"\b(?:Namun|Tetapi|Akan tetapi|Meski demikian|Walau demikian|perlu|masih|belum|sebaiknya|butuh)\b.*",
+        feedback,
+        re.IGNORECASE,
+    )
+    if match:
+        return match.group(0).strip(" .:-")
+    return feedback
+
+
 def _extract_strengths_improvements(dimensions: list[dict]) -> tuple[list[str], list[str]]:
     """
     Extract strengths dan improvements dari dimensi feedback.
-    
-    Strategi sederhana:
-    - Dimensi dengan skor >= 8.0 → strength
-    - Dimensi dengan skor < 6.5 → improvement
+
+    Strategi:
+    - strengths diambil dari dimensi skor tinggi dengan clause positif
+    - improvements diambil dari dimensi skor terendah atau feedback yang memuat cue perbaikan
+    - pastikan minimal ada 2 improvement bila feedback tersedia
     """
     strengths = []
     improvements = []
+    ranked_dimensions = []
 
     for dim in dimensions:
         key = dim.get("key", "")
-        score = float(dim.get("score", 0))
-        feedback = dim.get("feedback", "")
-        label = dim.get("label", key.replace("_", " ").title())
+        try:
+            score = float(dim.get("score", 0))
+        except (TypeError, ValueError):
+            score = 0.0
+        feedback = _clean_feedback_text(dim.get("feedback", ""))
+        label = dim.get("label") or dim.get("name") or key.replace("_", " ").title()
+        if not feedback:
+            continue
+        ranked_dimensions.append({
+            "label": label,
+            "score": score,
+            "feedback": feedback,
+        })
 
-        if score >= 8.0 and feedback:
-            strengths.append(f"{label}: {feedback[:300]}")
-        elif score < 6.5 and feedback:
-            improvements.append(f"{label}: {feedback[:300]}")
+    if not ranked_dimensions:
+        return strengths, improvements
 
-    return strengths, improvements
+    for dim in sorted(ranked_dimensions, key=lambda item: item["score"], reverse=True):
+        positive_clause = _extract_positive_clause(dim["feedback"])
+        lowered = positive_clause.lower()
+        if dim["score"] >= 7.5 or any(cue in lowered for cue in STRENGTH_CUES):
+            strengths.append(f"{dim['label']}: {positive_clause[:300]}")
+        if len(strengths) >= 3:
+            break
+
+    improvement_candidates = []
+    for dim in sorted(ranked_dimensions, key=lambda item: item["score"]):
+        lowered = dim["feedback"].lower()
+        if dim["score"] <= 7.9 or any(cue in lowered for cue in IMPROVEMENT_CUES):
+            clause = _extract_improvement_clause(dim["feedback"])
+            improvement_candidates.append(f"{dim['label']}: {clause[:300]}")
+
+    for item in improvement_candidates:
+        if item not in improvements:
+            improvements.append(item)
+        if len(improvements) >= 3:
+            break
+
+    if len(improvements) < 2:
+        for dim in sorted(ranked_dimensions, key=lambda item: item["score"]):
+            fallback = f"{dim['label']}: {_extract_improvement_clause(dim['feedback'])[:300]}"
+            if fallback not in improvements:
+                improvements.append(fallback)
+            if len(improvements) >= 2:
+                break
+
+    return strengths[:3], improvements[:3]
 
 
 def _build_references_output(top_references: list[dict]) -> list[dict]:

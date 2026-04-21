@@ -7,7 +7,19 @@ dan relevan untuk validasi asumsi business plan.
 
 from __future__ import annotations
 
+import re
+
 from app.graph.state import ReviewEngineState
+
+GENERIC_TOPIC_TERMS = {
+    "business",
+    "startup",
+    "indonesia",
+    "education technology",
+    "technology",
+    "software",
+    "saas",
+}
 
 
 def _safe_log(analysis_id: str, step: str, status: str, message: str) -> None:
@@ -30,6 +42,107 @@ def _compact_list(values: list[str], limit: int) -> str:
     return ", ".join(clean[:limit])
 
 
+def _customer_anchor(target_customer: list[str], industry: str) -> str:
+    joined = " ".join(target_customer).lower()
+    for token in ["campus", "kampus", "university", "universitas", "school", "sekolah"]:
+        if token in joined:
+            return "campus software" if token in {"campus", "kampus", "university", "universitas"} else "school software"
+    if industry.strip():
+        return f"{industry} software"
+    return "business software"
+
+
+def _topic_phrase(keywords: list[str], company_name: str, industry: str, geography: str) -> str:
+    blocked = {
+        company_name.lower().strip(),
+        industry.lower().strip(),
+        geography.lower().strip(),
+        "business",
+        "startup",
+        "indonesia",
+    }
+    candidates: list[str] = []
+    for keyword in keywords:
+        text = keyword.strip()
+        if not text:
+            continue
+        lowered = text.lower()
+        if lowered in blocked:
+            continue
+        if len(text) < 4:
+            continue
+        candidates.append(text.lower())
+        if len(candidates) >= 2:
+            break
+    return " ".join(candidates)
+
+
+def _topical_modifier(keywords: list[str], company_name: str, industry: str, geography: str) -> str:
+    for keyword in keywords:
+        text = re.sub(r"\s+", " ", (keyword or "").strip()).lower()
+        if not text or text in GENERIC_TOPIC_TERMS:
+            continue
+        if text in {company_name.lower().strip(), industry.lower().strip(), geography.lower().strip()}:
+            continue
+        if len(text) < 5:
+            continue
+        if text == "circular economy":
+            return "sustainability"
+        return text
+    return ""
+
+
+def _category_anchor(customer_anchor: str, keywords: list[str], company_name: str, industry: str, geography: str) -> str:
+    modifier = _topical_modifier(keywords, company_name, industry, geography)
+    if not modifier:
+        return customer_anchor
+    if modifier in customer_anchor.lower():
+        return customer_anchor
+    if " software" in customer_anchor:
+        return customer_anchor.replace(" software", f" {modifier} software")
+    return f"{customer_anchor} {modifier}".strip()
+
+
+def _extract_pricing_terms(signal: str) -> list[str]:
+    lowered = signal.lower()
+    terms: list[str] = []
+
+    for needle, label in [
+        ("subscription", "subscription"),
+        ("langganan", "subscription"),
+        ("paket", "subscription"),
+        ("license", "license"),
+        ("lisensi", "license"),
+        ("setup fee", "setup fee"),
+        ("komisi", "commission"),
+        ("commission", "commission"),
+        ("transaction fee", "transaction fee"),
+        ("per tahun", "annual"),
+        ("per bulan", "monthly"),
+        ("campus", "campus"),
+        ("kampus", "campus"),
+        ("school", "school"),
+        ("sekolah", "school"),
+        ("university", "university"),
+    ]:
+        if needle in lowered and label not in terms:
+            terms.append(label)
+
+    return terms
+
+
+def _select_pricing_query(pricing_signals: list[str], anchor: str, geography: str) -> str:
+    for signal in pricing_signals:
+        lowered = signal.lower()
+        if any(token in lowered for token in ["pricing", "harga", "paket", "langganan", "subscription", "per bulan", "per tahun"]):
+            terms = _extract_pricing_terms(signal)
+            if terms:
+                compact_terms = " ".join(term for term in terms[:4] if term not in {"subscription", "pricing benchmark"})
+                suffix = f" {compact_terms}" if compact_terms else ""
+                return f"{anchor} {geography}{suffix}".strip()
+    return f"{anchor} {geography}".strip()
+
+
 async def bizplan_search_prep_node(state: ReviewEngineState) -> dict:
     """
     Bangun query Tavily untuk market validation jalur bizplan.
@@ -45,19 +158,26 @@ async def bizplan_search_prep_node(state: ReviewEngineState) -> dict:
     target_customer = state.get("target_customer") or []
     revenue_model = state.get("revenue_model") or []
     pricing_signals = state.get("pricing_signals") or []
+    keywords = state.get("keywords") or []
 
     print("\n[bizplan_search_prep] Menyusun query validasi pasar dan kompetitor...")
     _safe_log(analysis_id, "bizplan_query_gen", "processing", "Menyusun query Tavily untuk validasi business plan...")
 
     customer_phrase = _compact_list(target_customer, 2) or "pelanggan bisnis"
     revenue_phrase = _compact_list(revenue_model, 2) or "model pendapatan"
-    pricing_phrase = pricing_signals[0] if pricing_signals else f"{industry} pricing benchmark {geography}"
+    customer_anchor = _customer_anchor(target_customer, industry)
+    topic_phrase = _topic_phrase(keywords, company_name, industry, geography)
+    market_anchor = " ".join(part for part in [customer_anchor, topic_phrase] if part).strip() or industry
+    competitor_anchor = _category_anchor(customer_anchor, keywords, company_name, industry, geography)
+    pricing_anchor = " ".join(part for part in [customer_anchor, "pricing benchmark"] if part).strip()
+    pricing_phrase = _select_pricing_query(pricing_signals, pricing_anchor, geography)
 
     tavily_queries = [
-        f"{industry} market size {geography}",
-        f"{industry} competitors {geography} {customer_phrase}",
-        f"{company_name} alternatives {industry} {geography}",
-        f"{industry} pricing benchmark {geography} {revenue_phrase}",
+        f"{market_anchor} market size {geography}".strip(),
+        f"{competitor_anchor} competitors {geography}".strip(),
+        f"best {competitor_anchor} providers {geography}".strip(),
+        f"{company_name} alternatives {competitor_anchor} {geography}".strip(),
+        f"{customer_anchor} pricing benchmark {geography} {revenue_phrase}".strip(),
         pricing_phrase,
     ]
 

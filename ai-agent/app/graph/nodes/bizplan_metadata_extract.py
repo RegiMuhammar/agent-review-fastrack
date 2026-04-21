@@ -12,6 +12,7 @@ Desain:
 from __future__ import annotations
 
 import re
+from collections import defaultdict
 
 from app.graph.state import ReviewEngineState
 
@@ -25,33 +26,103 @@ GENERIC_TITLES = {
     "proposal bisnis",
 }
 
-INDUSTRY_KEYWORDS = [
-    ("logistics", "Logistik"),
-    ("supply chain", "Logistik"),
-    ("fintech", "Fintech"),
-    ("payment", "Fintech"),
-    ("edtech", "Pendidikan"),
-    ("education", "Pendidikan"),
-    ("school", "Pendidikan"),
-    ("healthtech", "Kesehatan"),
-    ("health", "Kesehatan"),
-    ("medical", "Kesehatan"),
-    ("agritech", "Pertanian"),
-    ("agri", "Pertanian"),
-    ("farming", "Pertanian"),
-    ("saas", "SaaS"),
-    ("software", "SaaS"),
-    ("marketplace", "Marketplace"),
-    ("e-commerce", "E-commerce"),
-    ("ecommerce", "E-commerce"),
-    ("retail", "Retail"),
-    ("manufacturing", "Manufaktur"),
-    ("manufacture", "Manufaktur"),
-    ("energy", "Energi"),
-    ("tourism", "Pariwisata"),
-    ("travel", "Pariwisata"),
-    ("hospitality", "Pariwisata"),
-]
+INDUSTRY_SIGNALS = {
+    "Pendidikan": [
+        "edtech",
+        "education technology",
+        "education",
+        "school",
+        "kampus",
+        "campus",
+        "university",
+        "student",
+        "learning",
+        "pembelajaran",
+    ],
+    "SaaS": [
+        "saas",
+        "software as a service",
+        "software",
+        "dashboard",
+        "platform",
+        "subscription",
+    ],
+    "Logistik": [
+        "logistics",
+        "logistik",
+        "supply chain",
+        "fleet",
+        "delivery",
+        "freight",
+        "warehouse",
+    ],
+    "Fintech": [
+        "fintech",
+        "payment",
+        "lending",
+        "banking",
+        "wallet",
+    ],
+    "Kesehatan": [
+        "healthtech",
+        "health care",
+        "health",
+        "medical",
+        "klinik",
+        "rumah sakit",
+    ],
+    "Pertanian": [
+        "agritech",
+        "agri",
+        "farming",
+        "pertanian",
+        "petani",
+    ],
+    "Marketplace": [
+        "marketplace",
+        "two-sided",
+        "seller",
+        "merchant",
+    ],
+    "E-commerce": [
+        "e-commerce",
+        "ecommerce",
+        "online retail",
+        "retail tech",
+    ],
+    "Manufaktur": [
+        "manufacturing",
+        "manufacture",
+        "factory",
+        "industrial",
+    ],
+    "Energi": [
+        "energy",
+        "renewable",
+        "solar",
+        "power",
+    ],
+    "Pariwisata": [
+        "tourism",
+        "travel",
+        "hospitality",
+        "hotel",
+    ],
+}
+
+INDUSTRY_PRIORITY = {
+    "Pendidikan": 10,
+    "Kesehatan": 9,
+    "Pertanian": 8,
+    "Fintech": 7,
+    "Logistik": 6,
+    "Marketplace": 5,
+    "E-commerce": 4,
+    "Manufaktur": 3,
+    "Energi": 2,
+    "Pariwisata": 1,
+    "SaaS": 0,
+}
 
 BUSINESS_STAGE_PATTERNS = [
     (r"\bpre[- ]seed\b", "Pre-seed"),
@@ -104,6 +175,7 @@ TRACTION_HINTS = [
 PRICING_HINTS = [
     "harga",
     "pricing",
+    "price",
     "langganan",
     "subscription",
     "berlangganan",
@@ -112,6 +184,61 @@ PRICING_HINTS = [
     "rp",
     "$",
     "usd",
+    "starter",
+    "growth",
+    "enterprise",
+    "per bulan",
+    "per tahun",
+]
+
+PRICING_STRONG_HINTS = [
+    "harga",
+    "pricing",
+    "price",
+    "langganan",
+    "subscription",
+    "berlangganan",
+    "paket",
+    "tarif",
+    "starter",
+    "growth",
+    "enterprise",
+    "fee",
+    "license",
+    "lisensi",
+]
+
+NON_PRICING_METRIC_HINTS = [
+    "tam",
+    "sam",
+    "som",
+    "mrr",
+    "arr",
+    "gmv",
+    "tpv",
+    "cac",
+    "ltv",
+    "burn rate",
+    "monthly burn",
+    "cash burn",
+    "runway",
+    "gross margin",
+    "margin kotor",
+    "revenue",
+    "pendapatan",
+]
+
+METADATA_LABEL_PATTERN = re.compile(
+    r"\b(?:industry|industri|geography|geografi|business stage|tahap bisnis|funding ask|pendanaan|target customer|target pelanggan|company name|nama perusahaan)\b\s*:",
+    re.IGNORECASE,
+)
+
+OCR_ARTIFACT_HINTS = [
+    "start of picture text",
+    "end of picture text",
+    "picture text",
+    "image text",
+    "ocr text",
 ]
 
 
@@ -150,10 +277,66 @@ def _to_slug(value: str | None) -> str | None:
     return slug or None
 
 
+def _truncate_at_metadata_label(text: str) -> str:
+    if not text:
+        return ""
+    match = METADATA_LABEL_PATTERN.search(text)
+    return text[:match.start()].strip(" .:-|") if match else text.strip(" .:-|")
+
+
+def _sanitize_company_candidate(candidate: str | None) -> str | None:
+    if not candidate:
+        return None
+
+    candidate = re.sub(r"\s+", " ", candidate).strip(" .:-|")
+    candidate = _truncate_at_metadata_label(candidate)
+    candidate = re.split(r"\s{2,}|[|]", candidate)[0].strip(" .:-|")
+    candidate = candidate[:80].strip(" .:-|")
+
+    if not candidate:
+        return None
+
+    lowered = candidate.lower()
+    if lowered in GENERIC_TITLES:
+        return None
+    if any(token in lowered for token in ["industry:", "geography:", "funding ask:", "target customer:"]):
+        return None
+
+    words = candidate.split()
+    if len(words) > 8:
+        return None
+    return candidate
+
+
 def _split_sentences(text: str) -> list[str]:
     raw_sentences = re.split(r"(?<=[\.\!\?])\s+|\n{2,}", text)
     sentences = [re.sub(r"\s+", " ", sentence).strip(" -\n\t") for sentence in raw_sentences]
     return [sentence for sentence in sentences if len(sentence) >= 20]
+
+
+def _is_signal_noise(sentence: str) -> bool:
+    lowered = sentence.lower()
+    if any(hint in lowered for hint in OCR_ARTIFACT_HINTS):
+        return True
+    if "<br>" in lowered:
+        return True
+
+    metric_tokens = sum(1 for token in ["mrr", "arr", "gmv", "loi", "cac", "ltv"] if token in lowered)
+    numeric_tokens = len(re.findall(r"\d", sentence))
+    if metric_tokens >= 3 and numeric_tokens >= 4 and len(sentence.split()) <= 18:
+        return True
+    return False
+
+
+def _looks_like_pricing_sentence(sentence: str) -> bool:
+    lowered = sentence.lower()
+    has_strong_keyword = any(hint in lowered for hint in PRICING_STRONG_HINTS)
+    has_currency = bool(re.search(r"(?:rp|idr|usd|\$)\s?[\d]+(?:[\.,]\d+)?", lowered))
+    has_price_shape = bool(re.search(r"\b(?:per|/)\s*(?:bulan|month|tahun|year)\b", lowered))
+    has_non_pricing_metric = any(hint in lowered for hint in NON_PRICING_METRIC_HINTS)
+    if has_non_pricing_metric and not has_strong_keyword:
+        return False
+    return has_strong_keyword or (has_currency and has_price_shape and not has_non_pricing_metric)
 
 
 def _extract_company_name(state: ReviewEngineState, text: str) -> str | None:
@@ -163,20 +346,81 @@ def _extract_company_name(state: ReviewEngineState, text: str) -> str | None:
     ]:
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
-            return match.group(1).strip(" .:-")
+            candidate = _sanitize_company_candidate(match.group(1))
+            if candidate:
+                return candidate
 
-    title = (state.get("title") or "").strip()
-    if title.lower() not in GENERIC_TITLES:
+    first_non_empty_line = next((line.strip() for line in text.splitlines() if line.strip()), "")
+    candidate = _sanitize_company_candidate(first_non_empty_line.lstrip("#").strip())
+    if candidate:
+        return candidate
+
+    title = _sanitize_company_candidate((state.get("title") or "").strip())
+    if title:
         return title
     return None
 
 
-def _extract_industry(text: str, keywords: list[str]) -> str | None:
-    lowered = f"{text.lower()} {' '.join(keywords).lower()}"
-    for needle, label in INDUSTRY_KEYWORDS:
-        if needle in lowered:
-            return label
-    return None
+def _score_industry_phrase(phrase: str, weight: int, scores: dict[str, int]) -> None:
+    lowered = phrase.lower()
+    for label, needles in INDUSTRY_SIGNALS.items():
+        for needle in needles:
+            if needle in lowered:
+                scores[label] += weight
+
+
+def _extract_industry(text: str, keywords: list[str], title: str | None, document_head: str) -> str | None:
+    scores: dict[str, int] = defaultdict(int)
+
+    for pattern in [
+        r"(?:industry|industri|sector|bidang)\s*[:\-]\s*([^\n]{3,120})",
+    ]:
+        for match in re.finditer(pattern, text, re.IGNORECASE):
+            _score_industry_phrase(match.group(1), 6, scores)
+
+    if title:
+        _score_industry_phrase(title, 3, scores)
+
+    _score_industry_phrase(document_head[:2000], 2, scores)
+    _score_industry_phrase(" ".join(keywords), 3, scores)
+    _score_industry_phrase(text[:5000], 1, scores)
+
+    if not scores:
+        return None
+
+    return sorted(
+        scores.items(),
+        key=lambda item: (item[1], INDUSTRY_PRIORITY.get(item[0], -1)),
+        reverse=True,
+    )[0][0]
+
+
+def _clean_money_snippet(snippet: str) -> str:
+    snippet = re.sub(r"\s+", " ", snippet).strip(" .:-")
+    snippet = _truncate_at_metadata_label(snippet)
+    return snippet[:100].strip(" .:-")
+
+
+def _extract_money_phrase(text: str, pattern: str) -> str | None:
+    match = re.search(pattern, text, re.IGNORECASE)
+    if not match:
+        return None
+
+    snippet = _clean_money_snippet(match.group(1))
+    if not snippet:
+        return None
+
+    currency_match = re.search(
+        r"(?:(?:rp|idr|usd|\$)\s?[\d]+(?:[\.,]\d+)?(?:\s?(?:juta|miliar|triliun|million|billion))?|[\d]+(?:[\.,]\d+)?\s?(?:juta|miliar|triliun|million|billion)\s?(?:rupiah|idr)?)",
+        snippet,
+        re.IGNORECASE,
+    )
+    if not currency_match:
+        return None
+
+    start = currency_match.start()
+    phrase = snippet[start:].strip(" .:-")
+    return phrase[:100].strip(" .:-")
 
 
 def _extract_target_customer(text: str) -> list[str]:
@@ -186,7 +430,7 @@ def _extract_target_customer(text: str) -> list[str]:
         r"(?:target pengguna adalah|target pelanggan adalah|menyasar)\s+([^\n\.]{5,180})",
     ]:
         for match in re.finditer(pattern, text, re.IGNORECASE):
-            captured = match.group(1).strip()
+            captured = _truncate_at_metadata_label(match.group(1).strip())
             parts = re.split(r",|/| dan | serta ", captured)
             candidates.extend(part.strip(" .:-") for part in parts if len(part.strip()) >= 3)
 
@@ -200,7 +444,7 @@ def _extract_geography(text: str) -> str | None:
     ]:
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
-            return match.group(1).strip(" .:-")
+            return _truncate_at_metadata_label(match.group(1)).strip(" .:-")
 
     lowered = text.lower()
     for keyword in GEOGRAPHY_KEYWORDS:
@@ -217,23 +461,10 @@ def _extract_business_stage(text: str) -> str | None:
     return None
 
 
-def _extract_money_phrase(text: str, pattern: str) -> str | None:
-    match = re.search(pattern, text, re.IGNORECASE)
-    if not match:
-        return None
-    snippet = match.group(1).strip(" .:-")
-    currency_match = re.search(
-        r"(?:(?:rp|idr|usd|\$)\s?[\d\.,]+(?:\s?(?:juta|miliar|triliun|million|billion))?|[\d\.,]+\s?(?:juta|miliar|triliun)\s?(?:rupiah|idr)?)",
-        snippet,
-        re.IGNORECASE,
-    )
-    return currency_match.group(0).strip() if currency_match else snippet[:80]
-
-
 def _extract_funding_ask(text: str) -> str | None:
     for pattern in [
-        r"(?:funding ask|pendanaan yang dicari|kebutuhan pendanaan|investasi yang dibutuhkan|membutuhkan dana(?: sebesar)?)\s*[:\-]?\s*([^\n\.]{5,120})",
-        r"(?:kami mencari pendanaan sebesar|target pendanaan sebesar)\s+([^\n\.]{5,120})",
+        r"(?:funding ask|pendanaan yang dicari|kebutuhan pendanaan|investasi yang dibutuhkan|membutuhkan dana(?: sebesar)?)\s*[:\-]?\s*([^\n]{5,120})",
+        r"(?:kami mencari pendanaan sebesar|target pendanaan sebesar)\s+([^\n]{5,120})",
     ]:
         funding = _extract_money_phrase(text, pattern)
         if funding:
@@ -245,7 +476,13 @@ def _extract_signal_sentences(text: str, hints: list[str], max_items: int) -> li
     sentences = _split_sentences(text)
     matches = [
         sentence for sentence in sentences
-        if any(hint in sentence.lower() for hint in hints) and any(ch.isdigit() for ch in sentence)
+        if (
+            _looks_like_pricing_sentence(sentence)
+            if hints is PRICING_HINTS
+            else any(hint in sentence.lower() for hint in hints)
+        )
+        and any(ch.isdigit() for ch in sentence)
+        and not _is_signal_noise(sentence)
     ]
     return _unique_keep_order(matches)[:max_items]
 
@@ -263,6 +500,7 @@ async def bizplan_metadata_extract_node(state: ReviewEngineState) -> dict:
     raw_markdown = state.get("raw_markdown") or ""
     document_head = state.get("document_head") or ""
     keywords = state.get("keywords") or []
+    title = state.get("title")
 
     print("\n[bizplan_metadata_extract] Memulai ekstraksi metadata business plan...")
     _safe_log(analysis_id, "bizplan_metadata", "processing", "Mengekstrak metadata khusus business plan...")
@@ -284,7 +522,7 @@ async def bizplan_metadata_extract_node(state: ReviewEngineState) -> dict:
         }
 
     company_name = _extract_company_name(state, text)
-    industry = _extract_industry(text, keywords)
+    industry = _extract_industry(text, keywords, title, document_head)
     target_customer = _extract_target_customer(text)
     geography = _extract_geography(text)
     business_stage = _extract_business_stage(text)
