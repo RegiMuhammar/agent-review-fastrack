@@ -323,6 +323,7 @@ def test_bizplan_search_prep_adds_direct_competitor_discovery_query():
     queries = " | ".join(result["search_queries"]["tavily"]).lower()
     assert "campus sustainability software competitors indonesia" in queries
     assert "best campus sustainability software providers indonesia" in queries
+    assert "top higher education software vendors indonesia" in queries
 
 
 def test_search_rank_bizplan_filters_off_position_results_and_preserves_role_diversity():
@@ -567,6 +568,235 @@ def test_search_rank_bizplan_penalizes_investor_and_payroll_noise():
     assert ranked_urls[0] == "https://example.com/campus-pricing"
 
 
+def test_search_rank_bizplan_prefers_software_directory_over_press_release():
+    from app.graph.nodes.search_rank import search_rank_node
+
+    state = {
+        "analysis_id": "biz-sprint5-rank-directory",
+        "doc_type": "bizplan",
+        "title": "EduCycle",
+        "company_name": "EduCycle",
+        "industry": "Pendidikan",
+        "geography": "Indonesia",
+        "target_customer": ["kampus", "universitas"],
+        "keywords": ["sustainability", "education technology", "saas"],
+        "search_results": [
+            {
+                "title": "University management software in Indonesia",
+                "url": "https://openeducat.org/university-management-software-in-indonesia/",
+                "source": "tavily",
+                "snippet": "University management software for admissions, campus operations, and student workflows.",
+                "year": 2025,
+                "authors": [],
+            },
+            {
+                "title": "Indonesia edtech market size, share, growth, industry analysis",
+                "url": "https://www.openpr.com/news/4232079/indonesia-edtech-market-size-share-growth-industry-analysis",
+                "source": "tavily",
+                "snippet": "Press release about Indonesia edtech market growth.",
+                "year": 2025,
+                "authors": [],
+            },
+        ],
+    }
+
+    result = asyncio.run(search_rank_node(state))  # type: ignore[arg-type]
+    ranked_urls = [item["url"] for item in result["ranked_results"]]
+    assert ranked_urls[0] == "https://openeducat.org/university-management-software-in-indonesia/"
+
+
+def test_search_rank_bizplan_penalizes_broad_market_without_category_fit():
+    from app.graph.nodes.search_rank import search_rank_node
+
+    state = {
+        "analysis_id": "biz-sprint6-rank-market-fit",
+        "doc_type": "bizplan",
+        "title": "EduCycle",
+        "company_name": "EduCycle",
+        "industry": "Pendidikan",
+        "geography": "Indonesia",
+        "target_customer": ["kampus", "universitas"],
+        "keywords": ["circular economy", "education technology", "sustainability"],
+        "search_results": [
+            {
+                "title": "Indonesia Waste-to-Energy & Circular Economy Market",
+                "url": "https://example.com/circular-market",
+                "source": "tavily",
+                "snippet": "Circular economy market overview, market segmentation, and industry analysis in Indonesia.",
+                "year": 2025,
+                "authors": [],
+            },
+            {
+                "title": "Indonesia Edtech Market Size Report",
+                "url": "https://example.com/edtech-market",
+                "source": "tavily",
+                "snippet": "Indonesia edtech market growth as universities digitize campus operations and student services.",
+                "year": 2025,
+                "authors": [],
+            },
+        ],
+    }
+
+    result = asyncio.run(search_rank_node(state))  # type: ignore[arg-type]
+    ranked_urls = [item["url"] for item in result["ranked_results"]]
+    assert ranked_urls[0] == "https://example.com/edtech-market"
+
+
+def test_search_rank_bizplan_ignores_generic_price_article_as_pricing():
+    from app.graph.nodes.search_rank import search_rank_node
+
+    state = {
+        "analysis_id": "biz-sprint6-price-false-positive",
+        "doc_type": "bizplan",
+        "title": "EduCycle",
+        "company_name": "EduCycle",
+        "industry": "Pendidikan",
+        "geography": "Indonesia",
+        "target_customer": ["kampus"],
+        "keywords": ["education technology", "sustainability"],
+        "search_results": [
+            {
+                "title": "Peterson Indonesia: Sustainability Consultant",
+                "url": "https://www.petersonindonesia.com/",
+                "source": "tavily",
+                "snippet": "Plastic Price Surge: Geopolitical shock or a turning point for sustainable packaging?",
+                "year": 2025,
+                "authors": [],
+            },
+            {
+                "title": "Campus cloud software pricing",
+                "url": "https://campuskloud.io/pricing",
+                "source": "tavily",
+                "snippet": "Monthly and annual plans for campus management software.",
+                "year": 2025,
+                "authors": [],
+            },
+        ],
+    }
+
+    result = asyncio.run(search_rank_node(state))  # type: ignore[arg-type]
+    roles = {item["url"]: item["reference_role"] for item in result["ranked_results"]}
+    assert roles["https://www.petersonindonesia.com/"] != "pricing"
+    assert roles["https://campuskloud.io/pricing"] == "pricing"
+
+
+def test_bizplan_market_synthesis_excludes_consulting_site_from_substitutes():
+    from app.graph.nodes.bizplan_market_synthesis import bizplan_market_synthesis_node
+
+    state = {
+        "analysis_id": "biz-sprint8-substitute-noise",
+        "company_name": "EduCycle",
+        "industry": "Pendidikan",
+        "geography": "Indonesia",
+        "target_customer": ["kampus"],
+        "top_references": [
+            {
+                "title": "Peterson Indonesia: Sustainability Consultant",
+                "url": "https://www.petersonindonesia.com/",
+                "source": "tavily",
+                "snippet": "Consulting services for sustainability reporting and CSR mapping.",
+                "relevance_score": 0.66,
+                "reference_role": "general",
+            },
+            {
+                "title": "Pricing for Campus Cloud management software",
+                "url": "https://campuskloud.io/pricing",
+                "source": "tavily",
+                "snippet": "Campus cloud software pricing and modules for university operations.",
+                "relevance_score": 0.78,
+                "reference_role": "pricing",
+            },
+        ],
+    }
+
+    result = asyncio.run(bizplan_market_synthesis_node(state))  # type: ignore[arg-type]
+    substitutes = result["competition_insights"]["substitutes"]
+    assert "Campuskloud" in substitutes
+    assert all("Peterson" not in item for item in substitutes)
+
+
+def test_search_rank_bizplan_ignores_event_competition_as_competitor():
+    from app.graph.nodes.search_rank import search_rank_node
+
+    state = {
+        "analysis_id": "biz-sprint6-competition-false-positive",
+        "doc_type": "bizplan",
+        "title": "EduCycle",
+        "company_name": "EduCycle",
+        "industry": "Pendidikan",
+        "geography": "Indonesia",
+        "target_customer": ["kampus"],
+        "keywords": ["education technology", "sustainability"],
+        "search_results": [
+            {
+                "title": "Urban Design Competition - Monash University, Indonesia",
+                "url": "https://www.monash.edu/indonesia/competition/urban-design-competition",
+                "source": "tavily",
+                "snippet": "A competition for students to design sustainable cities.",
+                "year": 2025,
+                "authors": [],
+            },
+            {
+                "title": "Campus sustainability software competitors in Southeast Asia",
+                "url": "https://example.com/competition",
+                "source": "tavily",
+                "snippet": "Competitors in university sustainability software compete on analytics and implementation.",
+                "year": 2025,
+                "authors": [],
+            },
+        ],
+    }
+
+    result = asyncio.run(search_rank_node(state))  # type: ignore[arg-type]
+    roles = {item["url"]: item["reference_role"] for item in result["ranked_results"]}
+    assert roles["https://www.monash.edu/indonesia/competition/urban-design-competition"] != "competition"
+    assert roles["https://example.com/competition"] == "competition"
+
+
+def test_search_rank_bizplan_excludes_weak_directory_competition_from_top_references():
+    from app.graph.nodes.search_rank import search_rank_node
+
+    state = {
+        "analysis_id": "biz-sprint9-weak-directory",
+        "doc_type": "bizplan",
+        "title": "EduCycle",
+        "company_name": "EduCycle",
+        "industry": "Pendidikan",
+        "geography": "Indonesia",
+        "target_customer": ["kampus", "universitas"],
+        "keywords": ["education technology", "sustainability", "saas"],
+        "search_results": [
+            {
+                "title": "Indonesia Edtech Market Size, Share | Forecast 2034 - IMARC Group",
+                "url": "https://www.imarcgroup.com/indonesia-edtech-market",
+                "source": "tavily",
+                "snippet": "Indonesia edtech market size and growth as universities digitize student and campus services.",
+                "year": 2025,
+                "authors": [],
+            },
+            {
+                "title": "Pricing for Campus Cloud management software",
+                "url": "https://campuskloud.io/pricing",
+                "source": "tavily",
+                "snippet": "Monthly and annual plans for campus management software.",
+                "year": 2025,
+                "authors": [],
+            },
+            {
+                "title": "Top 20+ Education Companies in Indonesia (2026)",
+                "url": "https://techbehemoths.com/companies/education/indonesia",
+                "source": "tavily",
+                "snippet": "Discover top education companies in Indonesia and explore featured agencies.",
+                "year": 2025,
+                "authors": [],
+            },
+        ],
+    }
+
+    result = asyncio.run(search_rank_node(state))  # type: ignore[arg-type]
+    assert all("techbehemoths.com" not in ref["url"] for ref in result["top_references"])
+
+
 def test_bizplan_market_synthesis_requires_market_and_competition_coverage_for_validated():
     from app.graph.nodes.bizplan_market_synthesis import bizplan_market_synthesis_node
 
@@ -607,6 +837,53 @@ def test_bizplan_market_synthesis_requires_market_and_competition_coverage_for_v
     result = asyncio.run(bizplan_market_synthesis_node(state))  # type: ignore[arg-type]
     assert result["market_validation_status"] == "partial"
     assert any("kompetisi" in item.lower() for item in result["market_red_flags"])
+
+
+def test_bizplan_market_synthesis_rejects_broad_market_evidence_without_category_fit():
+    from app.graph.nodes.bizplan_market_synthesis import bizplan_market_synthesis_node
+
+    state = {
+        "analysis_id": "biz-sprint6-market-fit",
+        "company_name": "EduCycle",
+        "industry": "Pendidikan",
+        "geography": "Indonesia",
+        "target_customer": ["kampus"],
+        "top_references": [
+            {
+                "title": "Indonesia Waste-to-Energy & Circular Economy Market",
+                "url": "https://example.com/circular-market",
+                "source": "tavily",
+                "snippet": "Circular economy market overview and segmentation in Indonesia.",
+                "relevance_score": 0.72,
+                "reference_role": "market",
+                "market_fit_score": 0.0,
+            },
+            {
+                "title": "Pricing for Campus Cloud management software",
+                "url": "https://campuskloud.io/pricing",
+                "source": "tavily",
+                "snippet": "Campus cloud software pricing and modules for university operations.",
+                "relevance_score": 0.76,
+                "reference_role": "pricing",
+                "market_fit_score": 0.16,
+            },
+            {
+                "title": "College Management Software in Indonesia - OpenEduCat",
+                "url": "https://openeducat.org/college-management-software-in-indonesia/",
+                "source": "tavily",
+                "snippet": "OpenEduCat helps universities digitize admissions and campus operations.",
+                "relevance_score": 0.84,
+                "reference_role": "competition",
+                "market_fit_score": 0.20,
+            },
+        ],
+    }
+
+    result = asyncio.run(bizplan_market_synthesis_node(state))  # type: ignore[arg-type]
+    assert result["market_validation_status"] == "partial"
+    assert len(result["market_validation"]["evidence"]) == 1
+    assert result["market_validation"]["evidence"][0]["url"] == "https://campuskloud.io/pricing"
+    assert any("kategori bisnis inti" in item.lower() for item in result["market_red_flags"])
 
 
 def test_bizplan_market_synthesis_dedupes_market_evidence_and_requires_explicit_competition_role():
@@ -729,6 +1006,79 @@ def test_bizplan_market_synthesis_extracts_named_competitors_from_vendor_snippet
     assert "OpenEduCat" in competitors
     assert "Ellucian" in competitors
     assert "CampusKloud" in competitors
+
+
+def test_bizplan_market_synthesis_prefers_vendor_brand_over_generic_product_title():
+    from app.graph.nodes.bizplan_market_synthesis import bizplan_market_synthesis_node
+
+    state = {
+        "analysis_id": "biz-sprint5-market-brand-clean",
+        "company_name": "GreenCampus",
+        "industry": "Pendidikan",
+        "geography": "Indonesia",
+        "target_customer": ["kampus"],
+        "top_references": [
+            {
+                "title": "College Management Software in Indonesia - OpenEduCat",
+                "url": "https://openeducat.org/college-management-software-in-indonesia/",
+                "source": "tavily",
+                "snippet": "OpenEduCat helps universities digitize admissions, campus operations, and student workflows. Start FreeTalk today.",
+                "relevance_score": 0.84,
+                "reference_role": "competition",
+            },
+            {
+                "title": "Indonesia edtech market report",
+                "url": "https://example.com/market",
+                "source": "tavily",
+                "snippet": "Indonesia edtech demand continues to grow.",
+                "relevance_score": 0.71,
+                "reference_role": "market",
+            },
+        ],
+    }
+
+    result = asyncio.run(bizplan_market_synthesis_node(state))  # type: ignore[arg-type]
+    competitors = result["competition_insights"]["direct_competitors"]
+    assert "OpenEduCat" in competitors
+    assert all("Start FreeTalk" not in item for item in competitors)
+    assert all("College Management Software in Indonesia - OpenEduCat" not in item for item in competitors)
+
+
+def test_bizplan_market_synthesis_avoids_generic_directory_title_as_competitor():
+    from app.graph.nodes.bizplan_market_synthesis import bizplan_market_synthesis_node
+
+    state = {
+        "analysis_id": "biz-sprint6-directory-clean",
+        "company_name": "GreenCampus",
+        "industry": "Pendidikan",
+        "geography": "Indonesia",
+        "target_customer": ["kampus"],
+        "top_references": [
+            {
+                "title": "Top 20+ Education Companies in Indonesia (2026) - TechBehemoths",
+                "url": "https://techbehemoths.com/companies/education/indonesia",
+                "source": "tavily",
+                "snippet": "There are 11 Companies in Indonesia. Techgropse is a leading mobile app and web development company.",
+                "relevance_score": 0.82,
+                "reference_role": "competition",
+            },
+            {
+                "title": "Indonesia edtech market report",
+                "url": "https://example.com/market",
+                "source": "tavily",
+                "snippet": "Indonesia edtech demand continues to grow.",
+                "relevance_score": 0.71,
+                "reference_role": "market",
+            },
+        ],
+    }
+
+    result = asyncio.run(bizplan_market_synthesis_node(state))  # type: ignore[arg-type]
+    competitors = result["competition_insights"]["direct_competitors"]
+    assert all("TechBehemoths" not in item for item in competitors)
+    assert all("Top 20+ Education Companies" not in item for item in competitors)
+    assert all("Explore Top" not in item for item in competitors)
+    assert all("Discover Top" not in item for item in competitors)
 
 
 def test_bizplan_market_synthesis_uses_vendor_domain_as_substitute_when_only_pricing_page_exists():

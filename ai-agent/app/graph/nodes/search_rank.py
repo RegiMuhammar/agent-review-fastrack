@@ -107,6 +107,15 @@ PRODUCT_CATEGORY_HINTS = [
     "app",
 ]
 
+SOFTWARE_MARKET_HINTS = [
+    "software",
+    "platform",
+    "dashboard",
+    "erp",
+    "app",
+    "saas",
+]
+
 COMPETITION_FALSE_POSITIVE_HINTS = [
     "competitive landscape",
     "market overview",
@@ -124,6 +133,41 @@ NOISE_BIZPLAN_HINTS = [
     "attendance",
     "home education",
     "homeschool",
+]
+
+NON_PRODUCT_PRICING_HINTS = [
+    "consulting",
+    "consultancy",
+    "consultant",
+    "csr",
+    "packaging",
+    "commodity",
+    "plastic",
+    "supply chain",
+]
+
+GENERIC_DIRECTORY_TITLE_HINTS = [
+    "companies in",
+    "company in",
+    "services in",
+    "service providers",
+    "agencies",
+    "agency",
+    "firms",
+    "top 5",
+    "top 10",
+    "top 20",
+    "top 50",
+    "list of",
+]
+
+MARKET_REPORT_HINTS = [
+    "market size",
+    "market report",
+    "industry analysis",
+    "forecast",
+    "cagr",
+    "market growth",
 ]
 
 INDUSTRY_TERMS = {
@@ -169,6 +213,25 @@ TRUSTED_BIZPLAN_DOMAIN_HINTS = [
     "openeducat.org",
     "marketresearch.com",
     "kenresearch.com",
+]
+
+SOFTWARE_DIRECTORY_DOMAIN_HINTS = [
+    "g2.com",
+    "getapp.com",
+    "capterra.com",
+    "softwareadvice.com",
+    "sourceforge.net",
+    "crozdesk.com",
+    "trustradius.com",
+    "slashdot.org",
+    "openeducat.org",
+]
+
+PRESS_RELEASE_DOMAIN_HINTS = [
+    "openpr.com",
+    "prnewswire.com",
+    "globenewswire.com",
+    "einnews.com",
 ]
 
 BIZPLAN_EXCLUDED_DOMAIN_HINTS = [
@@ -249,26 +312,61 @@ def _classify_bizplan_reference_role(result: dict) -> str:
     haystack = f"{result.get('title', '')} {result.get('snippet', '')}".lower()
     if any(token in haystack for token in COMPETITION_FALSE_POSITIVE_HINTS) and "market" in haystack:
         return "market"
-    if any(token in haystack for token in ROLE_HINTS["competition"]):
+    if _looks_like_business_competition(result):
         return "competition"
     if _looks_like_competitor_landscape(result):
         return "competition"
-    if any(token in haystack for token in ROLE_HINTS["pricing"]):
+    if _looks_like_pricing_reference(result):
         return "pricing"
     if any(token in haystack for token in ROLE_HINTS["market"]):
         return "market"
     return "general"
 
 
+def _looks_like_business_competition(result: dict) -> bool:
+    title = (result.get("title") or "").lower()
+    snippet = (result.get("snippet") or "").lower()
+    url = (result.get("url") or "").lower()
+    haystack = f"{title} {snippet}"
+    has_explicit_business_term = any(token in haystack for token in ["competitor", "competitors", "alternative", "alternatives", "rival"])
+    has_generic_competition_term = any(token in haystack for token in ["competition", "competitive", "kompetisi", "kompetitor"])
+    has_product_context = any(hint in haystack for hint in PRODUCT_CATEGORY_HINTS) or any(
+        hint in url for hint in ["/compare", "/comparison", "/alternatives", "/vendors", "/vendor", "/category", "/directory"]
+    )
+    has_customer_context = any(pattern in haystack for pattern in ["campus", "university", "school", "software", "platform", "dashboard"])
+    return (has_explicit_business_term and (has_product_context or has_customer_context)) or (
+        has_generic_competition_term and has_product_context
+    )
+
+
+def _looks_like_pricing_reference(result: dict) -> bool:
+    title = (result.get("title") or "").lower()
+    snippet = (result.get("snippet") or "").lower()
+    url = (result.get("url") or "").lower()
+    haystack = f"{title} {snippet}"
+    has_pricing_term = any(token in haystack for token in ROLE_HINTS["pricing"])
+    if any(hint in haystack for hint in NON_PRODUCT_PRICING_HINTS):
+        return False
+    has_pricing_context = (
+        any(hint in haystack for hint in PRODUCT_CATEGORY_HINTS)
+        or any(hint in url for hint in ["/pricing", "/plans", "/plan", "/subscription"])
+        or any(token in haystack for token in ["per month", "per year", "monthly", "annual", "student", "plan"])
+    )
+    return has_pricing_term and has_pricing_context
+
+
 def _looks_like_competitor_landscape(result: dict) -> bool:
     title = (result.get("title") or "").lower()
     snippet = (result.get("snippet") or "").lower()
+    url = (result.get("url") or "").lower()
     haystack = f"{title} {snippet}"
 
     has_discovery_hint = any(hint in haystack for hint in DISCOVERY_COMPETITION_HINTS)
     has_product_hint = any(hint in haystack for hint in PRODUCT_CATEGORY_HINTS)
     if any(hint in haystack for hint in COMPETITION_FALSE_POSITIVE_HINTS):
         return False
+    has_directory_hint = any(hint in url for hint in ["/compare", "/comparison", "/alternatives", "/vendors", "/vendor", "/category", "/directory"])
+    has_directory_domain = any(hint in urlparse(url).netloc.lower() for hint in SOFTWARE_DIRECTORY_DOMAIN_HINTS)
     geography_patterns = [
         " in indonesia",
         " for universities",
@@ -279,6 +377,8 @@ def _looks_like_competitor_landscape(result: dict) -> bool:
     has_context_hint = any(pattern in haystack for pattern in geography_patterns)
 
     if "alternatives to" in haystack or "alternative to" in haystack or " vs " in haystack:
+        return True
+    if has_product_hint and has_context_hint and (has_directory_hint or has_directory_domain):
         return True
     return has_discovery_hint and has_product_hint and has_context_hint
 
@@ -301,15 +401,49 @@ def _bizplan_noise_penalty(haystack: str, role: str, state: ReviewEngineState) -
     return penalty
 
 
+def _bizplan_market_fit_score(haystack: str, state: ReviewEngineState) -> float:
+    customer_terms = list(state.get("target_customer") or [])
+    industry_terms = INDUSTRY_TERMS.get(state.get("industry") or "", [])
+    customer_overlap = _phrase_overlap_score(haystack, customer_terms, max_score=0.18)
+    industry_overlap = _phrase_overlap_score(haystack, industry_terms, max_score=0.18)
+    product_score = 0.08 if any(hint in haystack for hint in SOFTWARE_MARKET_HINTS) else 0.0
+    return round(min(customer_overlap + industry_overlap + product_score, 0.32), 3)
+
+
+def _is_weak_bizplan_competition_reference(result: dict) -> bool:
+    title = (result.get("title") or "").lower()
+    snippet = (result.get("snippet") or "").lower()
+    url = (result.get("url") or "").lower()
+    haystack = f"{title} {snippet}"
+
+    has_generic_directory_title = any(hint in title for hint in GENERIC_DIRECTORY_TITLE_HINTS)
+    has_product_context = any(hint in haystack for hint in PRODUCT_CATEGORY_HINTS)
+    has_vendor_url = any(hint in url for hint in ["/compare", "/comparison", "/alternatives", "/vendors", "/vendor", "/pricing"])
+    has_explicit_vendor_names = bool(re.search(r"\b[A-Z][a-z0-9]+[A-Z][A-Za-z0-9]+\b", result.get("snippet", "") or ""))
+
+    if has_generic_directory_title and not has_product_context:
+        return True
+    if has_generic_directory_title and not has_vendor_url and not has_explicit_vendor_names:
+        return True
+    return False
+
+
 def _bizplan_domain_score(result: dict) -> float:
     url = (result.get("url") or "").lower()
     if not url:
         return 0.0
     domain = urlparse(url).netloc.lower()
+    path = urlparse(url).path.lower()
     if any(hint in domain for hint in LOW_SIGNAL_DOMAIN_HINTS):
         return -0.18
+    if any(hint in domain for hint in PRESS_RELEASE_DOMAIN_HINTS):
+        return -0.16
+    if any(hint in domain for hint in SOFTWARE_DIRECTORY_DOMAIN_HINTS):
+        return 0.16
     if any(hint in domain for hint in TRUSTED_BIZPLAN_DOMAIN_HINTS):
         return 0.12
+    if any(hint in path for hint in ["/pricing", "/compare", "/comparison", "/alternatives", "/software", "/vendors", "/vendor"]):
+        return 0.1
     if domain.endswith(".org") or domain.endswith(".edu"):
         return 0.08
     return 0.0
@@ -339,6 +473,10 @@ def _bizplan_reference_score(result: dict, state: ReviewEngineState, target_year
         max_score=0.16,
     )
     product_score = 0.08 if any(hint in haystack for hint in PRODUCT_CATEGORY_HINTS) else 0.0
+    market_fit_score = _bizplan_market_fit_score(haystack, state)
+    market_report_bonus = 0.08 if role == "market" and market_fit_score >= 0.12 and any(
+        hint in haystack for hint in MARKET_REPORT_HINTS
+    ) else 0.0
 
     source_weights = {
         "semanticscholar": 0.12,
@@ -354,9 +492,16 @@ def _bizplan_reference_score(result: dict, state: ReviewEngineState, target_year
     penalty = 0.0
     if positive_overlap < 0.18 and any(hint in haystack for hint in OFF_POSITION_HINTS):
         penalty = 0.18
+    if role == "market":
+        if market_fit_score < 0.08:
+            penalty += 0.24
+        elif market_fit_score < 0.14:
+            penalty += 0.12
+    if role == "competition" and _is_weak_bizplan_competition_reference(result):
+        penalty += 0.24
     penalty += _bizplan_noise_penalty(haystack, role, state)
 
-    score = positive_overlap + role_score + source_score + recency + snippet_quality + domain_score - penalty
+    score = positive_overlap + role_score + source_score + recency + snippet_quality + domain_score + market_report_bonus - penalty
     return round(max(min(score, 1.0), 0.0), 3)
 
 
@@ -369,6 +514,10 @@ def _select_bizplan_top_references(ranked_results: list[dict], threshold: float)
             if result.get("reference_role") != role:
                 continue
             if result.get("relevance_score", 0.0) < threshold:
+                continue
+            if role == "market" and result.get("market_fit_score", 0.0) < 0.08:
+                continue
+            if role == "competition" and _is_weak_bizplan_competition_reference(result):
                 continue
             if _is_excluded_bizplan_domain(result):
                 continue
@@ -383,6 +532,8 @@ def _select_bizplan_top_references(ranked_results: list[dict], threshold: float)
         if result.get("relevance_score", 0.0) < threshold:
             continue
         if _is_excluded_bizplan_domain(result):
+            continue
+        if result.get("reference_role") == "competition" and _is_weak_bizplan_competition_reference(result):
             continue
         if result.get("reference_role") == "general" and result.get("relevance_score", 0.0) < threshold + 0.12:
             continue
@@ -674,6 +825,10 @@ async def search_rank_node(state: ReviewEngineState) -> dict:
             scored.append({
                 **r,
                 "reference_role": _classify_bizplan_reference_role(r),
+                "market_fit_score": _bizplan_market_fit_score(
+                    f"{r.get('title', '')} {r.get('snippet', '')}".lower(),
+                    state,
+                ),
                 "relevance_score": h_score,
             })
         else:

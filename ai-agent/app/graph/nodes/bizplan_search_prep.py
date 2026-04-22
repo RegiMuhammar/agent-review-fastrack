@@ -103,6 +103,15 @@ def _category_anchor(customer_anchor: str, keywords: list[str], company_name: st
     return f"{customer_anchor} {modifier}".strip()
 
 
+def _vendor_directory_query(customer_anchor: str, competitor_anchor: str, geography: str) -> str:
+    lowered_anchor = customer_anchor.lower()
+    if "campus" in lowered_anchor:
+        return f"top higher education software vendors {geography}".strip()
+    if "school" in lowered_anchor:
+        return f"top school management software vendors {geography}".strip()
+    return f"top {competitor_anchor} vendor directory {geography}".strip()
+
+
 def _extract_pricing_terms(signal: str) -> list[str]:
     lowered = signal.lower()
     terms: list[str] = []
@@ -176,7 +185,7 @@ async def bizplan_search_prep_node(state: ReviewEngineState) -> dict:
         f"{market_anchor} market size {geography}".strip(),
         f"{competitor_anchor} competitors {geography}".strip(),
         f"best {competitor_anchor} providers {geography}".strip(),
-        f"{company_name} alternatives {competitor_anchor} {geography}".strip(),
+        _vendor_directory_query(customer_anchor, competitor_anchor, geography),
         f"{customer_anchor} pricing benchmark {geography} {revenue_phrase}".strip(),
         pricing_phrase,
     ]
