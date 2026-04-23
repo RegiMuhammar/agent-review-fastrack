@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Internal;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendAnalysisAccessCodeEmailJob;
 use App\Models\Analysis;
 use App\Models\AnalysisLog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -57,14 +59,18 @@ class AnalysisInternalController extends Controller
         if ($validated['status'] === 'done') {
             $result = $validated['result'] ?? [];
             $scoreOverall = data_get($result, 'score_overall');
+            $accessCode = $this->generateUniqueAccessCode();
 
             $analysis->update([
                 'status' => 'done',
+                'access_code_hash' => hash('sha256', $accessCode),
                 'result_json' => $result,
                 'score_overall' => is_numeric($scoreOverall) ? (float) $scoreOverall : null,
                 'error_message' => null,
                 'completed_at' => now(),
             ]);
+
+            SendAnalysisAccessCodeEmailJob::dispatch($analysis->id, $accessCode);
 
             AnalysisLog::create([
                 'analysis_id' => $analysis->id,
@@ -123,6 +129,26 @@ class AnalysisInternalController extends Controller
         }
 
         return $firstLine;
+    }
+
+    private function generateUniqueAccessCode(int $length = 12): string
+    {
+        $maxAttempts = 5;
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $candidate = Str::upper(Str::random($length));
+            $hash = hash('sha256', $candidate);
+
+            $exists = Analysis::query()
+                ->where('access_code_hash', $hash)
+                ->exists();
+
+            if (! $exists) {
+                return $candidate;
+            }
+        }
+
+        throw new \RuntimeException('Gagal membuat kode akses unik.');
     }
 
     public function file(int $analysis): BinaryFileResponse

@@ -45,4 +45,8 @@ return [
         'base_url' => env('INTERNAL_BASE_URL', env('APP_URL', 'http://127.0.0.1:8000')),
     ],
 
+    'frontend' => [
+        'url' => env('FRONTEND_APP_URL', ''),
+    ],
+
 ];

@@ -14,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'file_path',
     'status',
     'task_id',
+    'access_code_hash',
+    'access_code_sent_at',
     'result_json',
     'score_overall',
     'error_message',
@@ -26,6 +28,7 @@ class Analysis extends Model
         return [
             'result_json' => 'array',
             'score_overall' => 'decimal:2',
+            'access_code_sent_at' => 'datetime',
             'completed_at' => 'datetime',
         ];
     }

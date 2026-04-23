@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
@@ -88,6 +89,39 @@ class AuthController extends Controller
             'message' => 'Data user berhasil diambil',
             'data' => [
                 'user' => $request->user(),
+            ],
+        ]);
+    }
+
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:150',
+                Rule::unique('users', 'email')->ignore($user->id),
+            ],
+            'company_name' => ['nullable', 'string', 'max:150'],
+            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        if (empty($validated['password'])) {
+            unset($validated['password']);
+        }
+
+        $user->fill($validated);
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Profile berhasil diperbarui',
+            'data' => [
+                'user' => $user->fresh(),
             ],
         ]);
     }
