@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { History, LayoutDashboard, LogOut, NotebookPen } from 'lucide-react'
+import { CircleUserRound, History, LayoutDashboard, LogOut, NotebookPen } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 import AlertPopup from '@/components/ui/alert-popup'
@@ -70,6 +70,10 @@ function ProtectedLayout() {
           </div>
 
           <nav className="grid gap-2">
+            <NavLink to="/profile" className={sidebarLinkClassName}>
+              <CircleUserRound className="size-4" />
+              Profile
+            </NavLink>
             <NavLink to="/dashboard" className={sidebarLinkClassName} end>
               <LayoutDashboard className="size-4" />
               Dashboard

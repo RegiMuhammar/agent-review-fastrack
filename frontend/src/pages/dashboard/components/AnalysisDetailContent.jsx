@@ -149,7 +149,10 @@ export default function AnalysisDetailContent(props) {
     hasResultData,
     errorMessage,
     onBack,
+    backButtonLabel = 'Kembali ke History',
     toDisplayText,
+    showFeedbackSection = true,
+    showBackButton = true,
   } = props
 
   return (
@@ -212,22 +215,26 @@ export default function AnalysisDetailContent(props) {
           />
         )}
 
-        <FeedbackSection
-          feedbackForm={feedbackForm}
-          setFeedbackForm={setFeedbackForm}
-          handleSubmitFeedback={handleSubmitFeedback}
-          isFeedbackSubmitting={isFeedbackSubmitting}
-          isFeedbackLocked={isFeedbackLocked}
-        />
+        {showFeedbackSection ? (
+          <FeedbackSection
+            feedbackForm={feedbackForm}
+            setFeedbackForm={setFeedbackForm}
+            handleSubmitFeedback={handleSubmitFeedback}
+            isFeedbackSubmitting={isFeedbackSubmitting}
+            isFeedbackLocked={isFeedbackLocked}
+          />
+        ) : null}
 
         <div className="flex flex-col gap-3">
           {!isLoading && !hasResultData && <p className="text-sm text-[#6A7DB7]">Hasil analisis belum tersedia.</p>}
           {errorMessage && <p className="text-sm text-red-600">{errorMessage}</p>}
-          <div className="flex justify-end">
-            <Button type="button" variant="outline" onClick={onBack}>
-              Kembali ke History
-            </Button>
-          </div>
+          {showBackButton ? (
+            <div className="flex justify-end">
+              <Button type="button" variant="outline" onClick={onBack}>
+                {backButtonLabel}
+              </Button>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

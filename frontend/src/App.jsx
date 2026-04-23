@@ -7,8 +7,10 @@ import RegisterPage from '@/pages/auth/RegisterPage'
 import AnalisisJurnalPage from '@/pages/dashboard/AnalisisJurnalPage'
 import DashboardPage from '@/pages/dashboard/DashboardPage'
 import HistoryJurnalPage from '@/pages/dashboard/HistoryJurnalPage'
+import ProfilePage from '@/pages/dashboard/ProfilePage'
 import ReviewJurnalPage from '@/pages/dashboard/ReviewJurnalPage'
 import HomePage from '@/pages/public/HomePage'
+import OpenAnalysisResultPage from '@/pages/public/OpenAnalysisResultPage'
 
 function ProtectedRoute() {
   const token = getAuthToken()
@@ -35,6 +37,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/buka-hasil" element={<OpenAnalysisResultPage />} />
 
         <Route element={<GuestRoute />}>
           <Route path="/login" element={<LoginPage />} />
@@ -43,6 +46,7 @@ function App() {
 
         <Route element={<ProtectedRoute />}>
           <Route element={<ProtectedLayout />}>
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/review-jurnal" element={<ReviewJurnalPage />} />
             <Route path="/analisis/:analysisId" element={<AnalisisJurnalPage />} />

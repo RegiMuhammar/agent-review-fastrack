@@ -92,6 +92,14 @@ export function logout(token) {
   })
 }
 
+export function updateProfile(token, payload) {
+  return request('/auth/profile', {
+    method: 'PUT',
+    token,
+    body: payload,
+  })
+}
+
 export function createAnalysis(token, payload) {
   const formData = new FormData()
   formData.append('doc_name', payload.docName)
@@ -165,5 +173,12 @@ export function listPublicFeedbacks(options = {}) {
 
   return request(path, {
     method: 'GET',
+  })
+}
+
+export function getAnalysisByAccessCode(payload) {
+  return request('/analysis/access', {
+    method: 'POST',
+    body: payload,
   })
 }
