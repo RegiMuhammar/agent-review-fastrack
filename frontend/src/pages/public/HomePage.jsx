@@ -6,6 +6,7 @@ import {
   ChevronRight,
   FileScan,
   ShieldCheck,
+  Sparkles,
   Star,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -103,50 +104,98 @@ function HomePage() {
         </div>
       </header>
 
-      <section id="home" className="relative overflow-hidden px-4 py-20 sm:px-6 sm:py-24 lg:px-8 lg:py-28">
-        <div className="pointer-events-none absolute -left-20 top-10 h-72 w-72 rounded-full bg-[#5E74C9]/12 blur-3xl" />
-        <div className="pointer-events-none absolute -right-20 bottom-0 h-80 w-80 rounded-full bg-[#5E74C9]/10 blur-3xl" />
+      <section
+        id="home"
+        className="relative min-h-[calc(100svh-4rem)] overflow-hidden bg-[linear-gradient(130deg,#edf1ff_0%,#f6f8ff_42%,#ffffff_100%)] flex flex-col"
+      >
+        {/* Background Video */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+        >
+          <source
+            src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260302_085640_276ea93b-d7da-4418-a09b-2aa5b490e838.mp4"
+            type="video/mp4"
+          />
+        </video>
+        {/* Overlay for text readability */}
+        <div className="pointer-events-none absolute inset-0 bg-white/10 backdrop-blur-[1px]" />
 
-        <div className="relative mx-auto grid w-full max-w-7xl gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-          <div>
-            <p className="inline-flex items-center gap-2 rounded-full bg-[#5E74C9]/10 px-3 py-1 text-xs font-semibold text-[#5E74C9]">
-              <BadgeCheck className="size-3.5" />
-              Platform Profil Jurnal Berbasis AI
-            </p>
-            <h1 className="mt-5 text-balance text-4xl font-bold leading-tight text-[#2E3F86] sm:text-5xl">
-              Profil singkat tim kami untuk percepatan review jurnal yang akurat.
-            </h1>
-            <p className="mt-4 max-w-2xl text-pretty text-base text-[#6A7DB7] sm:text-lg">
-              Kami membangun alur review jurnal end-to-end: upload dokumen PDF,
-              validasi cerdas, serta histori analisis yang mudah dipantau dalam satu dashboard.
-            </p>
+        {/* Spacer between navbar and hero content */}
+        <div className="flex-1 min-h-8 sm:min-h-12 lg:min-h-16 shrink-0" />
 
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <Button asChild size="lg" className="bg-[#5E74C9] text-white hover:bg-[#5166B8]">
-                <Link to="/login">
-                  Mulai Sekarang
-                  <ArrowRight className="ml-1 size-4" />
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="border-[#5E74C9]/25 text-[#5E74C9] hover:bg-[#5E74C9]/8 hover:text-[#4C61A8]">
-                <a href="#about">Pelajari Lebih Lanjut</a>
-              </Button>
-            </div>
+        {/* Hero Content — centered */}
+        <div className="relative z-10 mx-auto flex max-w-3xl flex-col items-center px-4 text-center sm:px-6">
+          {/* Badge */}
+          <p className="animate-fade-up inline-flex items-center gap-2 rounded-full bg-[#5E74C9]/10 px-4 py-1.5 text-xs font-semibold text-[#5E74C9]">
+            <Sparkles className="size-3.5" />
+            Powered by AI Agent Pipeline
+          </p>
+
+          {/* Headline */}
+          <h1 className="mt-6 font-bold leading-[1.05] tracking-tight text-[#2E3F86] text-[40px] min-[400px]:text-[44px] sm:text-6xl lg:text-7xl">
+            <span className="animate-fade-up block">Review Dokumen</span>
+            <span className="animate-fade-up block [animation-delay:100ms]">
+              10x Lebih Cepat.
+            </span>
+          </h1>
+
+          {/* Description */}
+          <p className="animate-fade-up [animation-delay:220ms] mt-5 max-w-lg text-[#6A7DB7] text-sm sm:text-base lg:text-lg leading-relaxed">
+            Upload PDF — dapatkan skor mendalam, feedback naratif,
+            <br className="hidden sm:block" />
+            dan referensi relevan dalam hitungan menit.{' '}
+            <span className="font-medium text-[#2E3F86]">Bukan minggu.</span>
+          </p>
+
+          {/* CTA Buttons */}
+          <div className="animate-fade-up [animation-delay:340ms] mt-6 flex flex-wrap items-center justify-center gap-3">
+            <Button asChild size="lg" className="bg-[#5E74C9] text-white text-sm font-medium px-7 py-3 rounded-full hover:bg-[#5166B8] hover:shadow-lg transition-all">
+              <Link to="/register">
+                Mulai Review Gratis
+                <ArrowRight className="ml-1.5 size-4" />
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline" className="border-[#5E74C9]/25 text-[#5E74C9] text-sm font-medium px-7 py-3 rounded-full hover:bg-[#5E74C9]/8 hover:text-[#4C61A8] transition-colors">
+              <a href="#tech">Lihat Demo</a>
+            </Button>
           </div>
+        </div>
 
-          <div className="space-y-4 text-[#5C70B2]">
-            <div className="rounded-2xl border border-[#5E74C9]/15 bg-white/85 p-5 shadow-[0_10px_30px_rgba(94,116,201,0.08)]">
-              <h3 className="text-sm font-semibold text-[#2E3F86]">Misi Kami</h3>
-              <p className="mt-2 text-sm">
-                Membantu akademisi dan peneliti mendapatkan proses review lebih cepat tanpa mengorbankan kualitas.
-              </p>
+        {/* Spacer between content and mockup */}
+        <div className="flex-1 min-h-10 sm:min-h-12 lg:min-h-16 shrink-0" />
+
+        {/* Dashboard Mockup */}
+        <div className="animate-hero-rise [animation-delay:500ms] relative z-0 w-[92%] sm:w-[84%] lg:w-[72%] max-w-5xl mx-auto shrink-0 -mb-10 sm:-mb-20 lg:-mb-32">
+          <div className="rounded-t-2xl overflow-hidden bg-[#1a1a1c] shadow-[0_-20px_80px_rgba(0,0,0,0.25)] ring-1 ring-white/10">
+            {/* Browser Title Bar */}
+            <div className="bg-[#242427] border-b border-white/5 px-4 py-2.5 flex items-center gap-3">
+              {/* Traffic lights */}
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[#febc2e]" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[#28c840]" />
+              </div>
+              {/* URL bar */}
+              <div className="flex-1 flex justify-center">
+                <div className="bg-[#1a1a1c] rounded-md px-6 py-1 text-[10px] text-white/60 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3 h-3 text-white/40" />
+                  jurnal-ai-fasttrack.app
+                </div>
+              </div>
+              {/* Spacer for symmetry */}
+              <div className="w-[52px]" />
             </div>
-            <div className="rounded-2xl border border-[#5E74C9]/15 bg-white/85 p-5 shadow-[0_10px_30px_rgba(94,116,201,0.08)]">
-              <h3 className="text-sm font-semibold text-[#2E3F86]">Fokus Produk</h3>
-              <p className="mt-2 text-sm">
-                Validasi dokumen, manajemen histori, dan pengalaman pengguna yang sederhana namun profesional.
-              </p>
-            </div>
+            {/* Screenshot */}
+            <img
+              src="/Demo.png"
+              alt="Dashboard Jurnal AI Fasttrack — menampilkan hasil review dokumen dengan skor, profil dimensi, dan feedback naratif"
+              className="w-full block"
+              loading="eager"
+            />
           </div>
         </div>
       </section>
